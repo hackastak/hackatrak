@@ -1,0 +1,17 @@
+# Compiled binary (built at module root)
+/hackatrak
+/Hackatrak
+
+# Test & build artifacts
+*.exe
+*.test
+*.out
+/bin/
+/dist/
+
+# Local env / state
+.env
+*.local
+
+# macOS
+.DS_Store
