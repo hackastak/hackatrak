@@ -14,5 +14,5 @@ go build ./...
 ## Run
 
 ```sh
-go run .
+go run ./cmd/hackatrak
 ```
