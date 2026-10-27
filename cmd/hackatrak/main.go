@@ -1,15 +1,30 @@
 // Command hackatrak is a local-first, automatic work log.
-//
-// Cobra wiring lands in the next Phase 0 step. This file only keeps the
-// binary building from cmd/hackatrak.
 package main
 
 import (
-	"fmt"
+	"os"
 
-	_ "github.com/spf13/cobra" // pinned until the root command lands
+	"github.com/spf13/cobra"
 )
 
 func main() {
-	fmt.Println("hackatrak: bare scaffold — ready to build out")
+	if err := newRootCmd().Execute(); err != nil {
+		os.Exit(1)
+	}
+}
+
+func newRootCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "hackatrak",
+		Short: "Local-first, automatic work log",
+	}
+	cmd.AddCommand(
+		newSyncCmd(),
+		newTodayCmd(),
+		newSummaryCmd(),
+		newLogCmd(),
+		newInstallCmd(),
+		newVersionCmd(),
+	)
+	return cmd
 }

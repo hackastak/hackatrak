@@ -1,0 +1,47 @@
+# Hackatrak config. Copy to ~/.config/hackatrak/config.toml and edit.
+# ~ is expanded in vault_path, spool_dir, roots path, and the config path itself.
+# One file per macOS account. The personal account is the writer. The work
+# account is the spooler and must not point role at "writer".
+
+# vault_path: Obsidian vault. Must be an existing directory.
+vault_path = "~/Developer/My_Notes"
+
+# weekly_glob: weekly-note path relative to the vault.
+# {YYYY} and {ww} are filled when the week file is resolved, not here.
+# Omit this key to use _Weekly/{YYYY}/{YYYY}-W{ww}.md.
+weekly_glob = "_Weekly/{YYYY}/{YYYY}-W{ww}.md"
+
+# account: short name for this macOS account. Used in the spool filename.
+account = "hackastak"
+
+# role: "writer" or "spooler".
+# writer splices bullets into the weekly note.
+# spooler writes only its spool file and never edits the note.
+role = "writer"
+
+# spool_dir: vault-relative directory for cross-account spool files.
+# Not required to exist yet. The writer reads it; the spooler creates it.
+spool_dir = "_Weekly/.hackatrak"
+
+# ticket_regex: tried against the branch name, then the commit message.
+# Omit the parentheses in the bullet when nothing matches.
+ticket_regex = 'NEXTGEN-\d+'
+
+# exclude_globs: extra file-name patterns the mtime scan ignores.
+exclude_globs = ["*.swp", "*~", ".DS_Store"]
+
+# summarizer: "mechanical" or "ollama".
+# mechanical is the v1 default. ollama is accepted and not implemented yet.
+summarizer = "mechanical"
+
+# roots: each entry maps a path prefix to a weekly-note bucket.
+# path must be an existing directory. bucket is the life-bucket heading.
+# List only this account's trees. On the work account, use path "~/Developer"
+# and bucket "SAP Business Network & ANT", with role "spooler".
+[[roots]]
+path = "~/Developer"
+bucket = "Hackastak"
+
+[git]
+# author_emails: only commits by these addresses count.
+author_emails = ["you@example.com"]
