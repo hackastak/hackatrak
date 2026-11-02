@@ -33,12 +33,13 @@ func Load(path string) (Config, error) {
 	}
 
 	var cfg Config
-	md, err := toml.Decode(string(data), &cfg)
+	src := string(data)
+	md, err := toml.Decode(src, &cfg)
 	if err != nil {
-		return Config{}, fmt.Errorf("load config %s: %w", expanded, err)
+		return Config{}, fmt.Errorf("load config %s: %w", expanded, diagnose(err))
 	}
 	if unknown := unknownFields(md); len(unknown) > 0 {
-		return Config{}, fmt.Errorf("load config %s: %w", expanded, errors.Join(unknown...))
+		return Config{}, fmt.Errorf("load config %s: %w", expanded, withLines(errors.Join(unknown...), src))
 	}
 
 	cfg, err = expandConfig(cfg)
@@ -47,9 +48,61 @@ func Load(path string) (Config, error) {
 	}
 	cfg = applyDefaults(cfg)
 	if err := Validate(cfg); err != nil {
-		return Config{}, fmt.Errorf("load config %s: %w", expanded, err)
+		return Config{}, fmt.Errorf("load config %s: %w", expanded, withLines(err, src))
 	}
 	return cfg, nil
+}
+
+// diagnose turns a TOML parse error into a field/line diagnostic.
+func diagnose(err error) error {
+	var pe toml.ParseError
+	if !errors.As(err, &pe) {
+		return err
+	}
+	field := pe.LastKey
+	if field == "" {
+		field = "config"
+	}
+	line := pe.Position.Line
+	if line == 0 {
+		line = pe.Line
+	}
+	return &FieldError{Field: field, Line: line, Msg: pe.Message}
+}
+
+func withLines(err error, src string) error {
+	if err == nil {
+		return nil
+	}
+	parts := flattenErrors(err)
+	out := make([]error, 0, len(parts))
+	for _, part := range parts {
+		var fe *FieldError
+		if !errors.As(part, &fe) {
+			out = append(out, part)
+			continue
+		}
+		line := fe.Line
+		if line == 0 {
+			line = lineForField(src, fe.Field)
+		}
+		out = append(out, &FieldError{Field: fe.Field, Line: line, Msg: fe.Msg})
+	}
+	return errors.Join(out...)
+}
+
+func flattenErrors(err error) []error {
+	if err == nil {
+		return nil
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		var out []error
+		for _, part := range joined.Unwrap() {
+			out = append(out, flattenErrors(part)...)
+		}
+		return out
+	}
+	return []error{err}
 }
 
 func expandHome(path string) (string, error) {

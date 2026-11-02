@@ -2,6 +2,9 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -33,6 +36,10 @@ func TestRootRegistersPhase0Subcommands(t *testing.T) {
 }
 
 func TestStubSubcommandsPrintPlaceholder(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeValidConfig(t, home)
+
 	for _, name := range []string{"sync", "today", "summary", "log", "install"} {
 		t.Run(name, func(t *testing.T) {
 			out, err := execute(t, name)
@@ -44,6 +51,18 @@ func TestStubSubcommandsPrintPlaceholder(t *testing.T) {
 				t.Errorf("output = %q, want %q", out, want)
 			}
 		})
+	}
+}
+
+func writeValidConfig(t *testing.T, home string) {
+	t.Helper()
+	body := fmt.Sprintf("vault_path = %q\nrole = \"writer\"\n\n[[roots]]\npath = %q\nbucket = \"Hackastak\"\n", home, home)
+	dir := filepath.Join(home, ".config", "hackatrak")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "config.toml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 

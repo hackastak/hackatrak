@@ -15,8 +15,11 @@ func main() {
 
 func newRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "hackatrak",
-		Short: "Local-first, automatic work log",
+		Use:                "hackatrak",
+		Short:              "Local-first, automatic work log",
+		SilenceUsage:       true,
+		PersistentPreRunE:  prepare,
+		PersistentPostRunE: finish,
 	}
 	cmd.AddCommand(
 		newSyncCmd(),

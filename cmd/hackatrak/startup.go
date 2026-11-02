@@ -1,0 +1,64 @@
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/hackastak/hackatrak/internal/config"
+	"github.com/hackastak/hackatrak/internal/store"
+	"github.com/spf13/cobra"
+)
+
+type appKey struct{}
+
+type appState struct {
+	db *store.DB
+}
+
+// prepare loads config and opens the database for every command except version.
+// Version must run even when config is missing. A bad config fails before the
+// database is created, so the first successful run is what migrates the schema.
+func prepare(cmd *cobra.Command, _ []string) error {
+	if cmd.Name() == "version" {
+		return nil
+	}
+
+	configPath, err := config.DefaultPath()
+	if err != nil {
+		return err
+	}
+	if _, err := config.Load(configPath); err != nil {
+		return err
+	}
+
+	dbPath, err := store.DefaultPath()
+	if err != nil {
+		return err
+	}
+	db, err := store.Open(dbPath)
+	if err != nil {
+		return err
+	}
+
+	ctx := cmd.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cmd.SetContext(context.WithValue(ctx, appKey{}, appState{db: db}))
+	return nil
+}
+
+func finish(cmd *cobra.Command, _ []string) error {
+	ctx := cmd.Context()
+	if ctx == nil {
+		return nil
+	}
+	state, ok := ctx.Value(appKey{}).(appState)
+	if !ok || state.db == nil {
+		return nil
+	}
+	if err := state.db.Close(); err != nil {
+		return fmt.Errorf("shutdown: %w", err)
+	}
+	return nil
+}

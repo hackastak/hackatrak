@@ -111,8 +111,25 @@ func TestLoadMalformedIncludesLine(t *testing.T) {
 	if !strings.Contains(msg, "line") {
 		t.Errorf("error = %q, want a line number", msg)
 	}
+	if !strings.Contains(msg, "role") {
+		t.Errorf("error = %q, want the field", msg)
+	}
 	if !strings.Contains(msg, path) {
 		t.Errorf("error = %q, want the config path", msg)
+	}
+}
+
+func TestLoadInvalidRoleIncludesFieldAndLine(t *testing.T) {
+	dir := t.TempDir()
+	path := writeConfig(t, dir, "vault_path = \""+dir+"\"\nrole = \"nope\"\n\n[[roots]]\npath = \""+dir+"\"\nbucket = \"Hackastak\"\n")
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("Load() error = nil, want a field error")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "role at line 2") {
+		t.Errorf("error = %q, want role at line 2", msg)
 	}
 }
 

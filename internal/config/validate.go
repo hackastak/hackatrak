@@ -6,13 +6,18 @@ import (
 	"os"
 )
 
-// FieldError is one config field that failed validation.
+// FieldError is one config field that failed validation or parsing.
+// Line is 1-based and 0 when the source location is unknown.
 type FieldError struct {
 	Field string
+	Line  int
 	Msg   string
 }
 
 func (e *FieldError) Error() string {
+	if e.Line > 0 {
+		return fmt.Sprintf("%s at line %d: %s", e.Field, e.Line, e.Msg)
+	}
 	return e.Field + ": " + e.Msg
 }
 
