@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -92,19 +93,34 @@ func CurrentBranch(repo string) (string, error) {
 }
 
 func gitOutput(repo string, args ...string) (string, error) {
-	cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
-	out, err := cmd.CombinedOutput()
-	text := strings.TrimSpace(string(out))
+	text, err := runGit(repo, args...)
 	if err != nil {
-		if text == "" {
-			return "", fmt.Errorf("current branch of %s: %w", repo, err)
-		}
-		return "", fmt.Errorf("current branch of %s: %w: %s", repo, err, text)
+		return "", fmt.Errorf("current branch of %s: %w", repo, err)
 	}
+	text = strings.TrimSpace(text)
 	if text == "" {
 		return "", fmt.Errorf("current branch of %s: empty git output", repo)
 	}
 	return text, nil
+}
+
+// runGit runs git -C repo and returns stdout. stderr is attached to the error.
+func runGit(repo string, args ...string) (string, error) {
+	cmd := exec.Command("git", append([]string{"-C", repo, "--no-pager"}, args...)...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = strings.TrimSpace(stdout.String())
+		}
+		if msg == "" {
+			return "", err
+		}
+		return "", fmt.Errorf("%w: %s", err, msg)
+	}
+	return stdout.String(), nil
 }
 
 // hasGitMetadata reports whether dir has a .git entry. A symlink is enough;
