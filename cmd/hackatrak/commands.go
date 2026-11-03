@@ -6,7 +6,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newSyncCmd() *cobra.Command    { return newStubCmd("sync") }
 func newTodayCmd() *cobra.Command   { return newStubCmd("today") }
 func newSummaryCmd() *cobra.Command { return newStubCmd("summary") }
 func newLogCmd() *cobra.Command     { return newStubCmd("log") }

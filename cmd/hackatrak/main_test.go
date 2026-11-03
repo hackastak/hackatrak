@@ -40,7 +40,7 @@ func TestStubSubcommandsPrintPlaceholder(t *testing.T) {
 	t.Setenv("HOME", home)
 	writeValidConfig(t, home)
 
-	for _, name := range []string{"sync", "today", "summary", "log", "install"} {
+	for _, name := range []string{"today", "summary", "log", "install"} {
 		t.Run(name, func(t *testing.T) {
 			out, err := execute(t, name)
 			if err != nil {
@@ -56,7 +56,7 @@ func TestStubSubcommandsPrintPlaceholder(t *testing.T) {
 
 func writeValidConfig(t *testing.T, home string) {
 	t.Helper()
-	body := fmt.Sprintf("vault_path = %q\nrole = \"writer\"\n\n[[roots]]\npath = %q\nbucket = \"Hackastak\"\n", home, home)
+	body := fmt.Sprintf("vault_path = %q\nrole = \"writer\"\n\n[[roots]]\npath = %q\nbucket = \"Hackastak\"\n\n[git]\nauthor_emails = [\"me@example.com\"]\n", home, home)
 	dir := filepath.Join(home, ".config", "hackatrak")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)

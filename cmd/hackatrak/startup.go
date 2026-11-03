@@ -12,7 +12,8 @@ import (
 type appKey struct{}
 
 type appState struct {
-	db *store.DB
+	cfg config.Config
+	db  *store.DB
 }
 
 // prepare loads config and opens the database for every command except version.
@@ -27,7 +28,8 @@ func prepare(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := config.Load(configPath); err != nil {
+	cfg, err := config.Load(configPath)
+	if err != nil {
 		return err
 	}
 
@@ -44,8 +46,20 @@ func prepare(cmd *cobra.Command, _ []string) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	cmd.SetContext(context.WithValue(ctx, appKey{}, appState{db: db}))
+	cmd.SetContext(context.WithValue(ctx, appKey{}, appState{cfg: cfg, db: db}))
 	return nil
+}
+
+func appFrom(cmd *cobra.Command) (appState, error) {
+	ctx := cmd.Context()
+	if ctx == nil {
+		return appState{}, fmt.Errorf("app state missing")
+	}
+	state, ok := ctx.Value(appKey{}).(appState)
+	if !ok || state.db == nil {
+		return appState{}, fmt.Errorf("app state missing")
+	}
+	return state, nil
 }
 
 func finish(cmd *cobra.Command, _ []string) error {
