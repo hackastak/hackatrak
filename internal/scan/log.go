@@ -41,6 +41,12 @@ func LocalMidnight(now time.Time) time.Time {
 // authors are email addresses; each is matched literally. At least one
 // is required so a shared repo cannot log someone else's commits.
 // Results are oldest first.
+//
+// An empty repo, or a repo with no matching commits in the window,
+// returns an empty slice. A detached HEAD is included after --branches,
+// so branch commits keep their branch name and detached-only commits
+// are labeled HEAD. A directory that is not itself a repo returns
+// ErrNotRepository, including a subdirectory of a repo.
 func CommitsSince(repo, since string, authors []string) ([]Commit, error) {
 	if strings.TrimSpace(repo) == "" {
 		return nil, fmt.Errorf("commits since: repo path is required")
@@ -49,24 +55,36 @@ func CommitsSince(repo, since string, authors []string) ([]Commit, error) {
 	if err != nil {
 		return nil, fmt.Errorf("commits since: %w", err)
 	}
+	if err := requireRepo(repo); err != nil {
+		return nil, fmt.Errorf("commits since: %w", err)
+	}
 	if strings.TrimSpace(since) == "" {
 		since = LocalMidnight(time.Now()).Format(time.RFC3339)
 	}
 
+	detached, err := detachedHEAD(repo)
+	if err != nil {
+		return nil, fmt.Errorf("commits since %s: %w", repo, err)
+	}
 	args := []string{
 		"log",
 		"--reverse",
 		"--branches",
 		"--source",
-		"--since", since,
-		"--pretty=format:" + commitLogFormat,
 	}
+	if detached {
+		args = append(args, "HEAD")
+	}
+	args = append(args, "--since", since, "--pretty=format:"+commitLogFormat)
 	for _, email := range emails {
 		args = append(args, "--author="+email)
 	}
 
 	out, err := runGit(repo, args...)
 	if err != nil {
+		if noCommitsYet(err) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("commits since %s: %w", repo, err)
 	}
 	commits, err := parseCommitLog(out)
