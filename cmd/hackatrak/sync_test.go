@@ -20,8 +20,8 @@ func TestSyncDryRunPrintsCommitsWithoutWriting(t *testing.T) {
 		t.Fatal(err)
 	}
 	gitCmd(t, repo, "init", "-b", "main")
-	gitCommitAt(t, repo, time.Now().Add(-2*time.Minute), "me@example.com", "Me", "wire the scan")
-	gitCommitAt(t, repo, time.Now().Add(-time.Minute), "other@example.com", "Other", "teammate work")
+	gitCommitAt(t, repo, commitOnToday(-2*time.Minute), "me@example.com", "Me", "wire the scan")
+	gitCommitAt(t, repo, commitOnToday(-time.Minute), "other@example.com", "Other", "teammate work")
 	writeSyncConfig(t, home, root)
 
 	out, err := execute(t, "sync", "--dry-run")
@@ -57,7 +57,7 @@ func TestSyncRecordsDetectedCommits(t *testing.T) {
 		t.Fatal(err)
 	}
 	gitCmd(t, repo, "init", "-b", "main")
-	gitCommitAt(t, repo, time.Now().Add(-2*time.Minute), "me@example.com", "Me", "record on sync")
+	gitCommitAt(t, repo, commitOnToday(-2*time.Minute), "me@example.com", "Me", "record on sync")
 	writeSyncConfig(t, home, root)
 
 	out, err := execute(t, "sync")
@@ -87,6 +87,19 @@ func TestSyncRecordsDetectedCommits(t *testing.T) {
 	if !strings.Contains(again, "sync: no commits") {
 		t.Fatalf("second dry-run = %q, want no commits", again)
 	}
+}
+
+// commitOnToday keeps a negative offset on today's local calendar day.
+// sync uses time.Now(), so a commit a few minutes ago is yesterday when
+// the test runs just after midnight. Git --since includes local midnight.
+func commitOnToday(offset time.Duration) time.Time {
+	now := time.Now()
+	when := now.Add(offset)
+	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	if when.Before(start) {
+		return start
+	}
+	return when
 }
 
 func writeSyncConfig(t *testing.T, home, root string) {

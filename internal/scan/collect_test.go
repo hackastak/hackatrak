@@ -17,12 +17,12 @@ func TestCollectGitDryRunDoesNotWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	git(t, repo, "init", "-b", "main")
-	gitCommit(t, repo, time.Now().Add(-48*time.Hour).Format(time.RFC3339), "me@example.com", "Me", "yesterday", "")
-	gitCommit(t, repo, time.Now().Add(-2*time.Minute).Format(time.RFC3339), "me@example.com", "Me", "ship collect", "")
-	gitCommit(t, repo, time.Now().Add(-time.Minute).Format(time.RFC3339), "teammate@example.com", "Them", "not mine", "")
+	now := time.Date(2026, 11, 3, 15, 0, 0, 0, time.FixedZone("CST", -6*3600))
+	gitCommit(t, repo, now.Add(-48*time.Hour).Format(time.RFC3339), "me@example.com", "Me", "yesterday", "")
+	gitCommit(t, repo, now.Add(-2*time.Minute).Format(time.RFC3339), "me@example.com", "Me", "ship collect", "")
+	gitCommit(t, repo, now.Add(-time.Minute).Format(time.RFC3339), "teammate@example.com", "Them", "not mine", "")
 
 	db := openScanDB(t)
-	now := time.Now()
 	got, err := CollectGit(db, []string{" " + root + " "}, []string{"me@example.com"}, now, true)
 	if err != nil {
 		t.Fatal(err)
@@ -57,11 +57,11 @@ func TestCollectGitPersistsThenRespectsCursor(t *testing.T) {
 		t.Fatal(err)
 	}
 	git(t, repo, "init", "-b", "main")
-	when := time.Now().Add(-2 * time.Minute)
+	now := time.Date(2026, 11, 3, 15, 0, 0, 0, time.FixedZone("CST", -6*3600))
+	when := now.Add(-2 * time.Minute)
 	gitCommit(t, repo, when.Format(time.RFC3339), "me@example.com", "Me", "record me", "body")
 
 	db := openScanDB(t)
-	now := time.Now()
 	first, err := CollectGit(db, []string{root, root}, []string{"me@example.com"}, now, false)
 	if err != nil {
 		t.Fatal(err)
