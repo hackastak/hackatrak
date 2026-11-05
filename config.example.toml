@@ -27,7 +27,11 @@ spool_dir = "_Weekly/.hackatrak"
 # Omit the parentheses in the bullet when nothing matches.
 ticket_regex = 'NEXTGEN-\d+'
 
-# exclude_globs: extra file-name patterns the mtime scan ignores.
+# exclude_globs: extra patterns the mtime scan ignores, on top of the built-ins
+# (.git/, build-output dirs, *.swp, *~, .DS_Store, *.o, *.pyc, *.class).
+# A pattern with / matches the path relative to the walk root. Otherwise it
+# matches the file or directory name. * does not cross a separator.
+# .gitignore files are always honored and are not configured here.
 exclude_globs = ["*.swp", "*~", ".DS_Store"]
 
 # summarizer: "mechanical" or "ollama".
