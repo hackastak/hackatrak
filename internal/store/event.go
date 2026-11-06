@@ -34,6 +34,78 @@ type Event struct {
 	FileSample  string
 }
 
+// DeleteFileTouch removes one file-touch row. A missing id returns
+// ErrNotFound. A commit id is rejected and left stored.
+func (db *DB) DeleteFileTouch(id int64) error {
+	if id == 0 {
+		return fmt.Errorf("delete file-touch: id is required")
+	}
+	existing, err := db.eventByID(id)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return fmt.Errorf("delete file-touch %d: %w", id, ErrNotFound)
+		}
+		return fmt.Errorf("delete file-touch %d: %w", id, err)
+	}
+	if existing.Kind != KindFileTouch {
+		return fmt.Errorf("delete file-touch %d: kind %q is not a file-touch", id, existing.Kind)
+	}
+	res, err := db.sql.Exec(`DELETE FROM events WHERE id = ? AND kind = ?`, id, string(KindFileTouch))
+	if err != nil {
+		return fmt.Errorf("delete file-touch %d: %w", id, err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("delete file-touch %d: %w", id, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("delete file-touch %d: %w", id, ErrNotFound)
+	}
+	return nil
+}
+
+// UpdateFileTouch replaces the count, sample, time, and slug of an existing
+// file-touch row. Kind, hash, and repo path stay as stored. A missing id
+// returns ErrNotFound. A commit id is rejected.
+func (db *DB) UpdateFileTouch(id int64, occurredAt time.Time, fileCount int, fileSample, projectSlug string) (Event, error) {
+	if id == 0 {
+		return Event{}, fmt.Errorf("update file-touch: id is required")
+	}
+	if occurredAt.IsZero() {
+		return Event{}, fmt.Errorf("update file-touch: occurred_at is required")
+	}
+	existing, err := db.eventByID(id)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return Event{}, fmt.Errorf("update file-touch %d: %w", id, ErrNotFound)
+		}
+		return Event{}, fmt.Errorf("update file-touch %d: %w", id, err)
+	}
+	if existing.Kind != KindFileTouch {
+		return Event{}, fmt.Errorf("update file-touch %d: kind %q is not a file-touch", id, existing.Kind)
+	}
+
+	_, err = db.sql.Exec(`
+		UPDATE events
+		SET occurred_at = ?, file_count = ?, file_sample = ?, project_slug = ?
+		WHERE id = ? AND kind = ?`,
+		formatTime(occurredAt.UTC()),
+		fileCount,
+		fileSample,
+		projectSlug,
+		id,
+		string(KindFileTouch),
+	)
+	if err != nil {
+		return Event{}, fmt.Errorf("update file-touch %d: %w", id, err)
+	}
+	updated, err := db.eventByID(id)
+	if err != nil {
+		return Event{}, fmt.Errorf("update file-touch %d: %w", id, err)
+	}
+	return updated, nil
+}
+
 // InsertEvent stores a new event. A repeated commit hash returns ErrDuplicate.
 func (db *DB) InsertEvent(e Event) (Event, error) {
 	if err := validateEvent(e); err != nil {
@@ -125,6 +197,18 @@ const eventSelect = `
 
 type rowScanner interface {
 	Scan(dest ...any) error
+}
+
+func (db *DB) eventByID(id int64) (Event, error) {
+	row := db.sql.QueryRow(eventSelect+` WHERE id = ?`, id)
+	event, err := scanEvent(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Event{}, ErrNotFound
+	}
+	if err != nil {
+		return Event{}, err
+	}
+	return event, nil
 }
 
 func scanEvent(row rowScanner) (Event, error) {

@@ -132,6 +132,98 @@ func TestFileTouchEventsDoNotCollide(t *testing.T) {
 	}
 }
 
+func TestDeleteFileTouchRemovesOnlyThatRow(t *testing.T) {
+	db := openTestDB(t)
+	when := time.Date(2026, 11, 5, 9, 0, 0, 0, time.UTC)
+	touch, err := db.InsertEvent(Event{
+		Kind: KindFileTouch, RepoPath: "/repo", OccurredAt: when, FileCount: 1, FileSample: "a.go",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit, err := db.InsertEvent(Event{
+		Kind: KindCommit, Hash: "abc", RepoPath: "/repo", OccurredAt: when,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.DeleteFileTouch(0); err == nil {
+		t.Fatal("id 0: error = nil, want an error")
+	}
+	if err := db.DeleteFileTouch(commit.ID); err == nil {
+		t.Fatal("commit id: error = nil, want an error")
+	}
+	if err := db.DeleteFileTouch(touch.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.DeleteFileTouch(touch.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("second delete error = %v, want ErrNotFound", err)
+	}
+	stored, err := db.EventsByRepo("/repo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored) != 1 || stored[0].Kind != KindCommit {
+		t.Fatalf("stored = %+v, want the commit", stored)
+	}
+}
+
+func TestUpdateFileTouchReplacesSample(t *testing.T) {
+	db := openTestDB(t)
+	when := time.Date(2026, 11, 5, 9, 0, 0, 0, time.FixedZone("CST", -6*3600))
+	inserted, err := db.InsertEvent(Event{
+		Kind: KindFileTouch, RepoPath: "/repo", ProjectSlug: "repo", OccurredAt: when, FileCount: 1, FileSample: "a.go",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	later := when.Add(time.Hour)
+	updated, err := db.UpdateFileTouch(inserted.ID, later, 3, "a.go, b.go", "repo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.ID != inserted.ID || updated.Kind != KindFileTouch || updated.Hash != "" || updated.RepoPath != "/repo" {
+		t.Fatalf("updated identity = %+v", updated)
+	}
+	if updated.FileCount != 3 || updated.FileSample != "a.go, b.go" || updated.ProjectSlug != "repo" {
+		t.Fatalf("updated fields = %+v", updated)
+	}
+	if !updated.OccurredAt.Equal(later) {
+		t.Fatalf("OccurredAt = %s, want %s", updated.OccurredAt, later)
+	}
+}
+
+func TestUpdateFileTouchRejectsMissingAndCommits(t *testing.T) {
+	db := openTestDB(t)
+	when := time.Date(2026, 11, 5, 9, 0, 0, 0, time.UTC)
+	commit, err := db.InsertEvent(Event{
+		Kind: KindCommit, Hash: "abc", RepoPath: "/repo", OccurredAt: when,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.UpdateFileTouch(0, when, 1, "a.go", ""); err == nil {
+		t.Fatal("id 0: error = nil, want an error")
+	}
+	if _, err := db.UpdateFileTouch(commit.ID, time.Time{}, 1, "a.go", ""); err == nil {
+		t.Fatal("zero time: error = nil, want an error")
+	}
+	if _, err := db.UpdateFileTouch(commit.ID, when, 1, "a.go", ""); err == nil {
+		t.Fatal("commit id: error = nil, want an error")
+	}
+	_, err = db.UpdateFileTouch(99, when, 1, "a.go", "")
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing id error = %v, want ErrNotFound", err)
+	}
+	stored, err := db.EventByHash("abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.Kind != KindCommit || stored.Hash != "abc" {
+		t.Fatalf("commit changed: %+v", stored)
+	}
+}
+
 func TestInsertEventRejectsIncomplete(t *testing.T) {
 	db := openTestDB(t)
 	when := time.Date(2026, 10, 28, 1, 0, 0, 0, time.UTC)

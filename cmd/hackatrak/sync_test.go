@@ -89,6 +89,85 @@ func TestSyncRecordsDetectedCommits(t *testing.T) {
 	}
 }
 
+func TestSyncRecordsFilePresenceWithoutACommit(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	root := filepath.Join(home, "Developer")
+	repo := filepath.Join(root, "demo")
+	if err := os.MkdirAll(repo, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gitCmd(t, repo, "init", "-b", "main")
+	if err := os.WriteFile(filepath.Join(repo, "main.go"), []byte("package demo\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeSyncConfig(t, home, root)
+
+	out, err := execute(t, "sync", "--dry-run")
+	if err != nil {
+		t.Fatalf("sync --dry-run: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "file-touch") || !strings.Contains(out, "main.go") {
+		t.Fatalf("dry-run = %q, want file presence", out)
+	}
+	if strings.Contains(out, "recorded") {
+		t.Fatalf("dry-run recorded: %q", out)
+	}
+
+	out, err = execute(t, "sync")
+	if err != nil {
+		t.Fatalf("sync: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "sync: recorded 0 commits, 1 file touches") {
+		t.Fatalf("output = %q, want one file touch", out)
+	}
+
+	db := openCLIStore(t, home)
+	events, err := db.EventsByRepo(resolved(t, repo))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 1 || events[0].Kind != store.KindFileTouch || events[0].FileSample != "main.go" {
+		t.Fatalf("events = %+v", events)
+	}
+}
+
+func TestSyncFilePresenceDoesNotDoubleCountACommit(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	root := filepath.Join(home, "Developer")
+	repo := filepath.Join(root, "demo")
+	if err := os.MkdirAll(repo, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gitCmd(t, repo, "init", "-b", "main")
+	gitCommitAt(t, repo, commitOnToday(-2*time.Minute), "me@example.com", "Me", "ship it")
+	if err := os.WriteFile(filepath.Join(repo, "main.go"), []byte("package demo\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeSyncConfig(t, home, root)
+
+	out, err := execute(t, "sync")
+	if err != nil {
+		t.Fatalf("sync: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "sync: recorded 1 commits, 0 file touches") {
+		t.Fatalf("output = %q, want the commit only", out)
+	}
+	if strings.Contains(out, "file-touch") {
+		t.Fatalf("output counted file presence beside the commit: %q", out)
+	}
+
+	db := openCLIStore(t, home)
+	events, err := db.EventsByRepo(resolved(t, repo))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 1 || events[0].Kind != store.KindCommit {
+		t.Fatalf("events = %+v, want the commit only", events)
+	}
+}
+
 // commitOnToday keeps a negative offset on today's local calendar day.
 // sync uses time.Now(), so a commit a few minutes ago is yesterday when
 // the test runs just after midnight. Git --since includes local midnight.
