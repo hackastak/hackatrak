@@ -17,7 +17,7 @@ func TestResolveGitProjectNestedFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveGitProject() error = %v", err)
 	}
-	want := GitProject{Root: resolved(t, repo), Name: "staksmith"}
+	want := GitProject{Root: resolved(t, repo), Name: "staksmith", Slug: "staksmith"}
 	if got != want {
 		t.Fatalf("ResolveGitProject() = %+v, want %+v", got, want)
 	}
@@ -32,7 +32,7 @@ func TestResolveGitProjectRepoRoot(t *testing.T) {
 		t.Fatalf("ResolveGitProject() error = %v", err)
 	}
 	wantRoot := resolved(t, repo)
-	want := GitProject{Root: wantRoot, Name: filepath.Base(wantRoot)}
+	want := GitProject{Root: wantRoot, Name: filepath.Base(wantRoot), Slug: filepath.Base(wantRoot)}
 	if got != want {
 		t.Fatalf("ResolveGitProject() = %+v, want %+v", got, want)
 	}
@@ -50,7 +50,7 @@ func TestResolveGitProjectNestedRepoWins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveGitProject() error = %v", err)
 	}
-	want := GitProject{Root: resolved(t, inner), Name: "web"}
+	want := GitProject{Root: resolved(t, inner), Name: "web", Slug: "web"}
 	if got != want {
 		t.Fatalf("ResolveGitProject() = %+v, want %+v", got, want)
 	}
@@ -65,7 +65,7 @@ func TestResolveGitProjectGitFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveGitProject() error = %v", err)
 	}
-	want := GitProject{Root: resolved(t, repo), Name: "worktree"}
+	want := GitProject{Root: resolved(t, repo), Name: "worktree", Slug: "worktree"}
 	if got != want {
 		t.Fatalf("ResolveGitProject() = %+v, want %+v", got, want)
 	}
@@ -87,7 +87,7 @@ func TestResolveGitProjectRelativePath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveGitProject() error = %v", err)
 	}
-	want := GitProject{Root: resolved(t, repo), Name: "hackatrak"}
+	want := GitProject{Root: resolved(t, repo), Name: "hackatrak", Slug: "hackatrak"}
 	if got != want {
 		t.Fatalf("ResolveGitProject() = %+v, want %+v", got, want)
 	}
@@ -101,7 +101,7 @@ func TestResolveGitProjectInsideGitDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveGitProject() error = %v", err)
 	}
-	want := GitProject{Root: resolved(t, repo), Name: "tool"}
+	want := GitProject{Root: resolved(t, repo), Name: "tool", Slug: "tool"}
 	if got != want {
 		t.Fatalf("ResolveGitProject() = %+v, want %+v", got, want)
 	}
@@ -119,7 +119,7 @@ func TestResolveGitProjectSymlinkedRepo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveGitProject() error = %v", err)
 	}
-	want := GitProject{Root: resolved(t, repo), Name: "realname"}
+	want := GitProject{Root: resolved(t, repo), Name: "realname", Slug: "realname"}
 	if got != want {
 		t.Fatalf("ResolveGitProject() = %+v, want %+v", got, want)
 	}
@@ -144,7 +144,7 @@ func TestResolveProjectFallbackFirstSegment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveProject() error = %v", err)
 	}
-	want := Project{Root: resolved(t, filepath.Join(root, "notes")), Name: "notes"}
+	want := Project{Root: resolved(t, filepath.Join(root, "notes")), Name: "notes", Slug: "notes"}
 	if got != want {
 		t.Fatalf("ResolveProject() = %+v, want %+v", got, want)
 	}
@@ -159,7 +159,7 @@ func TestResolveProjectGitWinsOverFirstSegment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveProject() error = %v", err)
 	}
-	want := Project{Root: resolved(t, repo), Name: "web"}
+	want := Project{Root: resolved(t, repo), Name: "web", Slug: "web"}
 	if got != want {
 		t.Fatalf("ResolveProject() = %+v, want %+v", got, want)
 	}
@@ -178,7 +178,7 @@ func TestResolveProjectLongestRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveProject() error = %v", err)
 	}
-	want := Project{Root: resolved(t, filepath.Join(special, "dep")), Name: "dep"}
+	want := Project{Root: resolved(t, filepath.Join(special, "dep")), Name: "dep", Slug: "dep"}
 	if got != want {
 		t.Fatalf("ResolveProject() = %+v, want %+v", got, want)
 	}
@@ -197,7 +197,7 @@ func TestResolveProjectEachAccountRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveProject() error = %v", err)
 	}
-	want := Project{Root: resolved(t, filepath.Join(sap, "jarvis")), Name: "jarvis"}
+	want := Project{Root: resolved(t, filepath.Join(sap, "jarvis")), Name: "jarvis", Slug: "jarvis"}
 	if got != want {
 		t.Fatalf("ResolveProject() = %+v, want %+v", got, want)
 	}

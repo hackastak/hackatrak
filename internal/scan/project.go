@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/hackastak/hackatrak/internal/config"
 )
 
 // ErrNoGitProject is returned when no ancestor of a path contains .git.
@@ -15,12 +17,16 @@ var ErrNoGitProject = errors.New("scan: no git project")
 // path segment under a matching root.
 var ErrNoProject = errors.New("scan: no project")
 
+// ErrNoBucket is returned when no roots[].path prefixes the path.
+var ErrNoBucket = errors.New("scan: no bucket")
+
 // Project is the directory treated as one unit of work.
 // Root is the git working tree, or the first path segment under the matching scan root.
-// Name is that directory's basename.
+// Name is that directory's basename. Slug is the Obsidian wikilink target, the repo dir name.
 type Project struct {
 	Root string
 	Name string
+	Slug string
 }
 
 // GitProject is the git-only view of Project.
@@ -61,7 +67,85 @@ func fallbackProject(path string, roots []string) (Project, error) {
 	if seg == "" || seg == "." || seg == ".." {
 		return Project{}, fmt.Errorf("%w: %s", ErrNoProject, path)
 	}
-	return Project{Root: filepath.Join(match, seg), Name: seg}, nil
+	return newProject(filepath.Join(match, seg))
+}
+
+// WikilinkSlug returns the Obsidian wikilink target for a project directory.
+// It is the repo directory name, unchanged: hyphens, dots, spaces, and case stay,
+// so [[supply-chain-monitor]] matches the folder. It does not walk to a git root;
+// pass the project directory from ResolveProject.
+func WikilinkSlug(projectRoot string) (string, error) {
+	root := strings.TrimSpace(projectRoot)
+	if root == "" {
+		return "", fmt.Errorf("wikilink slug: empty path")
+	}
+	cleaned := filepath.Clean(root)
+	if cleaned == "." || cleaned == ".." || isFilesystemRoot(cleaned) {
+		return "", fmt.Errorf("wikilink slug: %s is not a project directory", projectRoot)
+	}
+	slug := filepath.Base(cleaned)
+	if slug == "" || slug == "." || slug == ".." || isFilesystemRoot(slug) {
+		return "", fmt.Errorf("wikilink slug: %s is not a project directory", projectRoot)
+	}
+	return slug, nil
+}
+
+func isFilesystemRoot(path string) bool {
+	return path == string(filepath.Separator)
+}
+
+func newProject(root string) (Project, error) {
+	slug, err := WikilinkSlug(root)
+	if err != nil {
+		return Project{}, err
+	}
+	return Project{Root: root, Name: slug, Slug: slug}, nil
+}
+
+// ResolveBucket returns the bucket of the longest roots[].path that prefixes path.
+// Matching is a path boundary, not a raw string prefix, so Developer does not
+// match DeveloperExtra. The path may be the root itself. Paths are canonicalized
+// the same way as project resolution, so a symlinked root still matches.
+// An empty path is an error that does not wrap ErrNoBucket. A path under no
+// root returns ErrNoBucket. A matching root with an empty bucket is an error.
+func ResolveBucket(path string, roots []config.Root) (string, error) {
+	if strings.TrimSpace(path) == "" {
+		return "", fmt.Errorf("resolve bucket: empty path")
+	}
+	abs, err := canonicalPath(path)
+	if err != nil {
+		return "", fmt.Errorf("resolve bucket: %w", err)
+	}
+	match, bucket, ok := longestMatchingBucket(abs, roots)
+	if !ok {
+		return "", fmt.Errorf("%w: %s", ErrNoBucket, path)
+	}
+	if strings.TrimSpace(bucket) == "" {
+		return "", fmt.Errorf("resolve bucket: empty bucket for %s", match)
+	}
+	return bucket, nil
+}
+
+func longestMatchingBucket(path string, roots []config.Root) (string, string, bool) {
+	var best, bucket string
+	for _, root := range roots {
+		rootPath := strings.TrimSpace(root.Path)
+		if rootPath == "" {
+			continue
+		}
+		canon, err := canonicalPath(rootPath)
+		if err != nil {
+			continue
+		}
+		if !pathWithin(canon, path) {
+			continue
+		}
+		if len(canon) > len(best) {
+			best = canon
+			bucket = root.Bucket
+		}
+	}
+	return best, bucket, best != ""
 }
 
 func longestMatchingRoot(path string, roots []string) (string, bool) {
@@ -122,7 +206,7 @@ func ResolveGitProject(path string) (GitProject, error) {
 			return GitProject{}, fmt.Errorf("resolve git project: %w", err)
 		}
 		if ok {
-			return GitProject{Root: dir, Name: filepath.Base(dir)}, nil
+			return newProject(dir)
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
