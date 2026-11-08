@@ -63,11 +63,7 @@ func diagnose(err error) error {
 	if field == "" {
 		field = "config"
 	}
-	line := pe.Position.Line
-	if line == 0 {
-		line = pe.Line
-	}
-	return &FieldError{Field: field, Line: line, Msg: pe.Message}
+	return &FieldError{Field: field, Line: pe.Position.Line, Msg: pe.Message}
 }
 
 func withLines(err error, src string) error {

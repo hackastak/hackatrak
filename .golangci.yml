@@ -1,0 +1,44 @@
+# golangci-lint v2 configuration.
+# Run locally with `make lint` (installs golangci-lint if missing) or
+# `golangci-lint run`. See https://golangci-lint.run for the full reference.
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - bodyclose
+    - copyloopvar
+    - errorlint
+    - gocritic
+    - misspell
+    # - gosec   # Enable once tuned: a file scanner trips G304 (path from
+    #           # variable) by design; add targeted //nolint or exclusions first.
+    - nilerr
+    - revive
+    - unconvert
+    - unparam
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      # Test files may be less strict about error checks and security lints.
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gosec
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/hackastak/hackatrak

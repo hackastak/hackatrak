@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/spf13/cobra"
+
 	"github.com/hackastak/hackatrak/internal/config"
 	"github.com/hackastak/hackatrak/internal/store"
-	"github.com/spf13/cobra"
 )
 
 type appKey struct{}

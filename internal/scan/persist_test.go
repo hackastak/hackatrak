@@ -152,8 +152,8 @@ func TestPersistCommitsRejectsIncomplete(t *testing.T) {
 	valid := Commit{Hash: "ok", Time: when, Subject: "keep me out"}
 
 	cases := []struct {
-		name   string
-		repo   string
+		name    string
+		repo    string
 		commits []Commit
 	}{
 		{name: "empty repo", repo: "", commits: []Commit{valid}},

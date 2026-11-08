@@ -1,21 +1,98 @@
 # Hackatrak
 
-Local-first, automatic work log (Go). This repo is a bare scaffold.
+[![CI](https://github.com/hackastak/hackatrak/actions/workflows/ci.yml/badge.svg)](https://github.com/hackastak/hackatrak/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/hackastak/hackatrak.svg)](https://pkg.go.dev/github.com/hackastak/hackatrak)
+[![Go Report Card](https://goreportcard.com/badge/github.com/hackastak/hackatrak)](https://goreportcard.com/report/github.com/hackastak/hackatrak)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-The full design, phased build plan, and task list live in the Obsidian vault
-under `1. Projects/Hackatrak` (Feature_Brainstorm, Build_Plan, Implementation_Todo).
+**Hackatrak** is a local-first, automatic work log. It scans the git
+repositories and files you actually touch, collapses that activity into a
+per-day record of where your effort went, and keeps everything in a local
+SQLite database — no accounts, no servers, nothing leaves your machine.
 
-## Build
+> **Status:** early development (`0.x`). The `sync` and `version` commands work;
+> `today`, `summary`, `log`, and `install` are stubs. Interfaces may change
+> before `v1.0.0`.
+
+## How it works
+
+1. You point Hackatrak at the directories where your work lives (via
+   `config.toml`).
+2. `hackatrak sync` walks those trees, reads git history and file modification
+   times, and resolves each path to a **project** (nearest git root), a **life
+   bucket**, and an Obsidian **wikilink slug**.
+3. Activity is collapsed into day-level *presence* and written to a local store.
+4. Query commands report what you worked on today or over the week.
+
+## Install
+
+### From source
 
 ```sh
-make build    # ./hackatrak
-make test
-make install  # $(HOME)/.local/bin/hackatrak; override with PREFIX=
-make clean
+git clone https://github.com/hackastak/hackatrak.git
+cd hackatrak
+make install            # installs to ~/.local/bin (override with PREFIX=)
 ```
 
-## Run
+Make sure the install target is on your `PATH`, then:
 
 ```sh
-make build && ./hackatrak version
+hackatrak version
 ```
+
+### Prebuilt binaries
+
+Once releases are published, download the archive for your platform from the
+[Releases](https://github.com/hackastak/hackatrak/releases) page, extract it,
+and move the `hackatrak` binary onto your `PATH`.
+
+## Usage
+
+```sh
+hackatrak sync          # scan configured sources and update the log
+hackatrak today         # (planned) what you worked on today
+hackatrak summary       # (planned) a rollup for a period
+hackatrak log           # (planned) recent presence entries
+hackatrak version       # print build version and commit
+```
+
+## Configuration
+
+Hackatrak reads a TOML config file. Copy the example and edit it:
+
+```sh
+cp config.example.toml config.toml
+```
+
+See [`config.example.toml`](config.example.toml) for the full set of options
+and inline documentation.
+
+## Development
+
+```sh
+make build        # build ./hackatrak
+make test         # race-enabled test suite
+make lint         # golangci-lint (installed locally on first run)
+make check        # full local gate: fmt + vet + lint + test
+make help         # list all targets
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow, commit
+conventions, and release process.
+
+## Project layout
+
+```
+cmd/hackatrak/      CLI entry point and command wiring (cobra)
+internal/config/    TOML config loading and validation
+internal/scan/      Repository and file scanning, project/bucket/slug resolution
+internal/derive/    Deriving presence from raw activity
+internal/summarize/ Mechanical day-level summarization
+internal/store/     SQLite persistence and migrations
+internal/query/     Today / week queries
+internal/vault/     Obsidian vault integration
+```
+
+## License
+
+[MIT](LICENSE) © Hackastak
