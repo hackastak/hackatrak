@@ -68,6 +68,54 @@ This triggers the release workflow, which builds cross-platform binaries and
 publishes a GitHub Release. Before tagging, move the `[Unreleased]` entries
 into a new versioned section in the changelog.
 
+### Future: Homebrew distribution
+
+A Homebrew tap (`brew install`) is intentionally **not** set up yet. It's a
+public "stable enough to install and keep updated" promise, so it's deferred
+until the MVP commands work and there's a release worth telling people to
+install (roughly the first functional `v0.1.0`+). When that time comes, it's a
+small addition on top of the existing release pipeline:
+
+1. **Create the tap repository.** A public repo named `homebrew-tap` under the
+   same owner (`github.com/hackastak/homebrew-tap`). GoReleaser commits the
+   generated formula here; users then run
+   `brew install hackastak/tap/hackatrak`.
+2. **Create a push token.** A fine-grained personal access token (or a machine
+   user's token) with **contents: write** on the tap repo. Add it to the
+   `hackatrak` repo as an Actions secret, e.g. `HOMEBREW_TAP_GITHUB_TOKEN`.
+3. **Expose the secret to the release job** in
+   [`.github/workflows/release.yml`](.github/workflows/release.yml), alongside
+   the existing `GITHUB_TOKEN`:
+
+   ```yaml
+   env:
+     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+     HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+   ```
+
+4. **Add a `brews:` block** to [`.goreleaser.yaml`](.goreleaser.yaml):
+
+   ```yaml
+   brews:
+     - name: hackatrak
+       repository:
+         owner: hackastak
+         name: homebrew-tap
+         token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+       homepage: https://github.com/hackastak/hackatrak
+       description: Local-first, automatic work log
+       license: MIT
+       test: |
+         system "#{bin}/hackatrak", "version"
+   ```
+
+5. **Validate and release.** Run `goreleaser check`, then cut a tag as usual.
+   GoReleaser builds the binaries, pushes the formula to the tap, and the
+   `brew install` path goes live.
+
+Keep the formula's `license` and `description` in sync with
+[`LICENSE`](LICENSE) and the project description if they change.
+
 ## Code of conduct
 
 By participating you agree to abide by our
