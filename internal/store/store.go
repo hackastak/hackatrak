@@ -1,4 +1,4 @@
-// Package store opens the local SQLite database and persists events.
+// Package store opens the local SQLite database and persists events and day presence.
 package store
 
 import (
