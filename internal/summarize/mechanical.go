@@ -15,9 +15,12 @@ const maxSummaryRunes = 160
 var conventionalPrefix = regexp.MustCompile(`^(?i)(?:feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(?:\([^)]+\))?!?:\s+`)
 
 // MechanicalSummarizer condenses commit subjects into one readable line.
-// The zero value is ready to use. It does not extract tickets or invent
-// file-touch text; those are separate steps behind the same Summarizer seam.
-type MechanicalSummarizer struct{}
+// The zero value is ready to use. TicketRegex is the config ticket_regex;
+// empty means no ticket is extracted. A day with no usable subject falls
+// back to the file-touch text.
+type MechanicalSummarizer struct {
+	TicketRegex string
+}
 
 // Summarize joins cleaned commit subjects in caller order.
 //
@@ -26,10 +29,20 @@ type MechanicalSummarizer struct{}
 // prefixes are stripped. Merge commits and empty subjects are dropped.
 // A repeated subject, compared case-insensitively, keeps the first wording.
 // Subjects that would push the joined line past maxSummaryRunes are omitted
-// and counted as "(+N more)". The input day is not modified.
-func (MechanicalSummarizer) Summarize(day Day) (Summary, error) {
-	subjects := condenseSubjects(day.Commits)
-	return Summary{Line: subjects}, nil
+// and counted as "(+N more)". When nothing usable remains, the line is the
+// file-touch fallback. Ticket is the first ticket_regex match, branch
+// before commit message, and empty when nothing matches. The input day is
+// not modified. An invalid TicketRegex is an error and returns a zero Summary.
+func (m MechanicalSummarizer) Summarize(day Day) (Summary, error) {
+	ticket, err := extractTicket(m.TicketRegex, day)
+	if err != nil {
+		return Summary{}, err
+	}
+	line := condenseSubjects(day.Commits)
+	if line == "" {
+		line = fileFallback(day.FileCount, day.FileSample)
+	}
+	return Summary{Line: line, Ticket: ticket}, nil
 }
 
 func condenseSubjects(commits []Commit) string {

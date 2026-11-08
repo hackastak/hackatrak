@@ -6,8 +6,9 @@ import (
 )
 
 // TestMechanicalSummarizerCondensesSubjects is P5.2: commit subjects become
-// one readable line. Order is the caller's order. Ticket text is not parsed
-// here, and file-touch fallback is a later task.
+// one readable line. Order is the caller's order. These cases set no
+// ticket_regex and no file sample, so Ticket stays empty and the line is
+// only the condensed subjects.
 func TestMechanicalSummarizerCondensesSubjects(t *testing.T) {
 	tests := []struct {
 		name    string

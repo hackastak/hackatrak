@@ -37,8 +37,8 @@ type Summary struct {
 }
 
 // Summarizer turns one project-day into Summary.
-// Mechanical condensation and a later model summarizer share this method.
-// A summarizer must not modify Day.
+// MechanicalSummarizer and OllamaSummarizer share this method. The Ollama
+// implementation is a stub in v1. A summarizer must not modify Day.
 type Summarizer interface {
 	Summarize(Day) (Summary, error)
 }

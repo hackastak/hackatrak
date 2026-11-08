@@ -3,7 +3,8 @@ package summarize
 import "testing"
 
 // stubSummarizer proves Summarizer is an interface, not a concrete type.
-// P5.5's Ollama summarizer has to be able to sit behind the same method.
+// OllamaSummarizer sits behind the same method; its v1 behavior is tested
+// on its own.
 type stubSummarizer struct {
 	line   string
 	ticket string
@@ -56,6 +57,6 @@ func TestSummarizerIsTheSeam(t *testing.T) {
 		t.Fatalf("MechanicalSummarizer line = %q", got.Line)
 	}
 	if got.Ticket != "" {
-		t.Fatalf("Ticket = %q, want empty until ticket extraction", got.Ticket)
+		t.Fatalf("Ticket = %q, want empty when TicketRegex is unset", got.Ticket)
 	}
 }

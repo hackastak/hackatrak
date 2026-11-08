@@ -35,7 +35,8 @@ ticket_regex = 'NEXTGEN-\d+'
 exclude_globs = ["*.swp", "*~", ".DS_Store"]
 
 # summarizer: "mechanical" or "ollama".
-# mechanical is the v1 default. ollama is accepted and not implemented yet.
+# mechanical is the v1 default. ollama is accepted; OllamaSummarizer is a
+# stub and returns an error until the model path is implemented.
 summarizer = "mechanical"
 
 # roots: each entry maps a path prefix to a weekly-note bucket.
