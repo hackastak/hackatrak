@@ -11,7 +11,8 @@ vault_path = "~/Developer/My_Notes"
 # Omit this key to use _Weekly/{YYYY}/{YYYY}-W{ww}.md.
 weekly_glob = "_Weekly/{YYYY}/{YYYY}-W{ww}.md"
 
-# account: short name for this macOS account. Used in the spool filename.
+# account: this macOS account, one filename segment (letters, digits, ".", "_", "-").
+# Used in spool-<account>-<YYYY>-W<ww>.json. Required.
 account = "hackastak"
 
 # role: "writer" or "spooler".
@@ -19,8 +20,10 @@ account = "hackastak"
 # spooler writes only its spool file and never edits the note.
 role = "writer"
 
-# spool_dir: vault-relative directory for cross-account spool files.
-# Not required to exist yet. The writer reads it; the spooler creates it.
+# spool_dir: directory for cross-account spool files, inside the vault.
+# Relative paths are joined to vault_path. ~ is expanded.
+# Omit this key to use _Weekly/.hackatrak. It does not need to exist yet.
+# The writer reads it; the spooler creates it. It must not contain "..".
 spool_dir = "_Weekly/.hackatrak"
 
 # ticket_regex: tried against the branch name, then the commit message.
@@ -41,6 +44,7 @@ summarizer = "mechanical"
 
 # roots: each entry maps a path prefix to a weekly-note bucket.
 # path must be an existing directory. bucket is the life-bucket heading.
+# An account may list more than one root, each with its own bucket.
 # List only this account's trees. On the work account, use path "~/Developer"
 # and bucket "SAP Business Network & ANT", with role "spooler".
 [[roots]]

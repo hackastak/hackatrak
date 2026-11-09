@@ -56,7 +56,7 @@ func TestStubSubcommandsPrintPlaceholder(t *testing.T) {
 
 func writeValidConfig(t *testing.T, home string) {
 	t.Helper()
-	body := fmt.Sprintf("vault_path = %q\nrole = \"writer\"\n\n[[roots]]\npath = %q\nbucket = \"Hackastak\"\n\n[git]\nauthor_emails = [\"me@example.com\"]\n", home, home)
+	body := fmt.Sprintf("vault_path = %q\nrole = \"writer\"\naccount = \"hackastak\"\n\n[[roots]]\npath = %q\nbucket = \"Hackastak\"\n\n[git]\nauthor_emails = [\"me@example.com\"]\n", home, home)
 	dir := filepath.Join(home, ".config", "hackatrak")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)

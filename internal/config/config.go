@@ -5,6 +5,10 @@ package config
 // Placeholders are filled when the week file is resolved, not during load.
 const DefaultWeeklyGlob = "_Weekly/{YYYY}/{YYYY}-W{ww}.md"
 
+// DefaultSpoolDir is the vault-relative directory for cross-account spool files.
+// Load joins it to vault_path. The directory does not need to exist yet.
+const DefaultSpoolDir = "_Weekly/.hackatrak"
+
 // Role is which account this binary is running as.
 type Role string
 
@@ -33,7 +37,12 @@ type Git struct {
 }
 
 // Config is the on-disk configuration. The zero value is empty.
-// Load applies defaults and ~ expansion, then Validate checks the result.
+// Load applies defaults and ~ expansion, resolves spool_dir under the vault,
+// then Validate checks the result.
+//
+// Account and Role are the cross-account handoff identity. Bucket is
+// roots[].bucket: one account may map several roots to different headings.
+// A writer splices the weekly note. A spooler writes only its spool.
 type Config struct {
 	VaultPath    string     `toml:"vault_path"`
 	WeeklyGlob   string     `toml:"weekly_glob"`

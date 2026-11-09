@@ -184,7 +184,7 @@ func commitOnToday(offset time.Duration) time.Time {
 func writeSyncConfig(t *testing.T, home, root string) {
 	t.Helper()
 	copyWeeklyTemplate(t, home)
-	body := "vault_path = " + quote(home) + "\nrole = \"writer\"\n\n[[roots]]\npath = " + quote(root) + "\nbucket = \"Hackastak\"\n\n[git]\nauthor_emails = [\"me@example.com\"]\n"
+	body := "vault_path = " + quote(home) + "\nrole = \"writer\"\naccount = \"hackastak\"\n\n[[roots]]\npath = " + quote(root) + "\nbucket = \"Hackastak\"\n\n[git]\nauthor_emails = [\"me@example.com\"]\n"
 	writeConfigBody(t, home, body)
 }
 

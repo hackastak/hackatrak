@@ -214,7 +214,8 @@ func TestSyncWriterKeepsBucketsSeparate(t *testing.T) {
 	copyWeeklyTemplate(t, vaultPath)
 	writeConfigBody(t, home, ""+
 		"vault_path = "+quote(vaultPath)+"\n"+
-		"role = \"writer\"\n\n"+
+		"role = \"writer\"\n"+
+		"account = \"hackastak\"\n\n"+
 		"[[roots]]\npath = "+quote(hackRoot)+"\nbucket = \"Hackastak\"\n\n"+
 		"[[roots]]\npath = "+quote(sapRoot)+"\nbucket = \"SAP Business Network & ANT\"\n\n"+
 		"[git]\nauthor_emails = [\"me@example.com\"]\n")
@@ -257,7 +258,7 @@ func TestSyncSpoolerDoesNotTouchNote(t *testing.T) {
 	}
 	gitCmd(t, repo, "init", "-b", "main")
 	gitCommitAt(t, repo, commitOnToday(-time.Minute), "me@example.com", "Me", "spooler must not splice")
-	writeConfigBody(t, home, "vault_path = "+quote(vaultPath)+"\nrole = \"spooler\"\n\n[[roots]]\npath = "+quote(root)+"\nbucket = \"Hackastak\"\n\n[git]\nauthor_emails = [\"me@example.com\"]\n")
+	writeConfigBody(t, home, "vault_path = "+quote(vaultPath)+"\nrole = \"spooler\"\naccount = \"i568439\"\n\n[[roots]]\npath = "+quote(root)+"\nbucket = \"Hackastak\"\n\n[git]\nauthor_emails = [\"me@example.com\"]\n")
 
 	out, err := execute(t, "sync")
 	if err != nil {
@@ -336,7 +337,7 @@ func TestSyncWriterIdleDoesNotCreateNote(t *testing.T) {
 
 func writeWriterConfig(t *testing.T, home, vaultPath, root, bucket string) {
 	t.Helper()
-	body := "vault_path = " + quote(vaultPath) + "\nrole = \"writer\"\nticket_regex = 'NEXTGEN-\\d+'\n\n[[roots]]\npath = " + quote(root) + "\nbucket = " + quote(bucket) + "\n\n[git]\nauthor_emails = [\"me@example.com\"]\n"
+	body := "vault_path = " + quote(vaultPath) + "\nrole = \"writer\"\naccount = \"hackastak\"\nticket_regex = 'NEXTGEN-\\d+'\n\n[[roots]]\npath = " + quote(root) + "\nbucket = " + quote(bucket) + "\n\n[git]\nauthor_emails = [\"me@example.com\"]\n"
 	writeConfigBody(t, home, body)
 }
 

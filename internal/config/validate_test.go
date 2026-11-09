@@ -81,6 +81,7 @@ func TestValidateAcceptsExistingDirectories(t *testing.T) {
 	dir := t.TempDir()
 	err := Validate(Config{
 		VaultPath:  dir,
+		Account:    "hackastak",
 		Role:       RoleSpooler,
 		Roots:      []Root{{Path: dir, Bucket: "Hackastak"}},
 		Summarizer: SummarizerMechanical,

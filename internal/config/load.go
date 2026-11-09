@@ -47,6 +47,10 @@ func Load(path string) (Config, error) {
 		return Config{}, fmt.Errorf("load config %s: %w", expanded, err)
 	}
 	cfg = applyDefaults(cfg)
+	cfg.SpoolDir, err = ResolveSpoolDir(cfg)
+	if err != nil {
+		return Config{}, fmt.Errorf("load config %s: %w", expanded, withLines(err, src))
+	}
 	if err := Validate(cfg); err != nil {
 		return Config{}, fmt.Errorf("load config %s: %w", expanded, withLines(err, src))
 	}
@@ -160,8 +164,13 @@ func applyDefaults(cfg Config) Config {
 	if summarizer == "" {
 		summarizer = SummarizerMechanical
 	}
+	spool := strings.TrimSpace(cfg.SpoolDir)
+	if spool == "" {
+		spool = DefaultSpoolDir
+	}
 	cfg.WeeklyGlob = weekly
 	cfg.Summarizer = summarizer
+	cfg.SpoolDir = spool
 	return cfg
 }
 

@@ -34,7 +34,7 @@ func TestPhase0(t *testing.T) {
 
 	t.Run("malformed config", func(t *testing.T) {
 		home := t.TempDir()
-		body := fmt.Sprintf("vault_path = %q\nrole = \"nope\"\n\n[[roots]]\npath = %q\nbucket = \"Hackastak\"\n", home, home)
+		body := fmt.Sprintf("vault_path = %q\nrole = \"nope\"\naccount = \"hackastak\"\n\n[[roots]]\npath = %q\nbucket = \"Hackastak\"\n", home, home)
 		writeConfigBody(t, home, body)
 
 		out, err := runHackatrak(t, bin, home, "sync")
