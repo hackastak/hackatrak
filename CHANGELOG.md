@@ -19,13 +19,20 @@ release (`v0.1.0`). Until then it all lives under _Unreleased_.
 - Local-first work-log core backed by SQLite (`modernc.org/sqlite`, no CGo).
 - `sync` command: scans configured repositories, collapses git and file
   activity into per-day presence, and persists it to the local store.
+- Writer-role `sync` splices one marked bullet per project into today's
+  weekday of that root's weekly-note bucket. A re-run replaces the marked
+  line and leaves hand-written lines alone. A missing week file is created
+  from `_templates/Weekly_note.md`. A spooler run and `--dry-run` do not
+  edit the note.
 - Repository scanning: resolves a project from the nearest git root (falling
   back to the first path segment), derives the life bucket and Obsidian
   wikilink slug from the project path, and tracks a cursor so each run only
   processes new activity.
 - Query layer for "today" and "this week" presence, including derived rows and
   file-only days.
-- Mechanical summarization of collected activity into day-level presence.
+- Mechanical summarizer: condenses commit subjects into one line, with a
+  file-touch fallback and optional ticket extraction. The Ollama summarizer
+  is accepted by config and still a stub.
 - TOML configuration with schema validation (`config.example.toml`).
 - `version` command reporting the build version and git commit, injected at
   build time via `-ldflags`.

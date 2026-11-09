@@ -17,12 +17,18 @@ SQLite database — no accounts, no servers, nothing leaves your machine.
 ## How it works
 
 1. You point Hackatrak at the directories where your work lives (via
-   `config.toml`).
+   `~/.config/hackatrak/config.toml`).
 2. `hackatrak sync` walks those trees, reads git history and file modification
    times, and resolves each path to a **project** (nearest git root), a **life
    bucket**, and an Obsidian **wikilink slug**.
-3. Activity is collapsed into day-level *presence* and written to a local store.
-4. Query commands report what you worked on today or over the week.
+3. Activity is collapsed into day-level *presence*, summarized, and written to
+   a local store.
+4. On a `writer` account, that same run splices one bullet per project into
+   today's weekday under that root's bucket in the weekly note. Each auto line
+   ends with an invisible `<!-- ht:<slug> -->` marker. A re-run replaces that
+   line and leaves unmarked lines alone. A missing week file is created from
+   `_templates/Weekly_note.md`. A `spooler` run and `sync --dry-run` do not
+   edit the note.
 
 ## Install
 
@@ -49,7 +55,8 @@ and move the `hackatrak` binary onto your `PATH`.
 ## Usage
 
 ```sh
-hackatrak sync          # scan configured sources and update the log
+hackatrak sync          # scan, record presence, and splice writer bullets
+hackatrak sync --dry-run  # print detected work without writing
 hackatrak today         # (planned) what you worked on today
 hackatrak summary       # (planned) a rollup for a period
 hackatrak log           # (planned) recent presence entries
@@ -61,7 +68,8 @@ hackatrak version       # print build version and commit
 Hackatrak reads a TOML config file. Copy the example and edit it:
 
 ```sh
-cp config.example.toml config.toml
+mkdir -p ~/.config/hackatrak
+cp config.example.toml ~/.config/hackatrak/config.toml
 ```
 
 See [`config.example.toml`](config.example.toml) for the full set of options
@@ -90,7 +98,7 @@ internal/derive/    Deriving presence from raw activity
 internal/summarize/ Mechanical day-level summarization
 internal/store/     SQLite persistence and migrations
 internal/query/     Today / week queries
-internal/vault/     Obsidian vault integration
+internal/vault/     Weekly-note path, template fill, and marked-bullet splice
 ```
 
 ## License
