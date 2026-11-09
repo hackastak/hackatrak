@@ -26,18 +26,27 @@ func newSyncCmd() *cobra.Command {
 }
 
 // runSync collects git commits and file-mtime presence. A repo with a commit
-// today is not also recorded as a file-touch. Later phases derive presence
-// and write the vault. --dry-run stops at printing.
+// today is not also recorded as a file-touch. The writer role then splices
+// today's bullets into its own buckets only. A spooler does not touch the
+// weekly note. --dry-run stops at printing.
 func runSync(cmd *cobra.Command, dryRun bool) error {
 	state, err := appFrom(cmd)
 	if err != nil {
 		return err
 	}
-	collected, err := collectSync(state.cfg, state.db, time.Now(), dryRun)
+	now := time.Now()
+	collected, err := collectSync(state.cfg, state.db, now, dryRun)
 	if err != nil {
 		return err
 	}
-	return printCollect(cmd.OutOrStdout(), collected, dryRun)
+	if dryRun {
+		return printCollect(cmd.OutOrStdout(), collected, true, 0)
+	}
+	wrote, err := writeOwnBuckets(state.cfg, state.db, now, cmd.ErrOrStderr())
+	if err != nil {
+		return err
+	}
+	return printCollect(cmd.OutOrStdout(), collected, false, wrote)
 }
 
 type syncCollect struct {
@@ -78,17 +87,24 @@ func rootPaths(cfg config.Config) []string {
 	return roots
 }
 
-func printCollect(w io.Writer, collected syncCollect, dryRun bool) error {
+func printCollect(w io.Writer, collected syncCollect, dryRun bool, wrote int) error {
 	if dryRun {
-		if err := printDryRun(w, collected); err != nil {
-			return err
-		}
-		return nil
+		return printDryRun(w, collected)
 	}
-	_, err := fmt.Fprintf(w, "sync: recorded %d commits, %d file touches\n",
+	if _, err := fmt.Fprintf(w, "sync: recorded %d commits, %d file touches\n",
 		collected.git.Inserted,
 		collected.files.Inserted+collected.files.Updated,
-	)
+	); err != nil {
+		return err
+	}
+	if wrote == 0 {
+		return nil
+	}
+	noun := "bullets"
+	if wrote == 1 {
+		noun = "bullet"
+	}
+	_, err := fmt.Fprintf(w, "sync: wrote %d %s\n", wrote, noun)
 	return err
 }
 
