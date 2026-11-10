@@ -25,6 +25,7 @@ prefer to remain anonymous.
 
 ## Scope
 
-Hackatrak is a local-first tool that reads local git repositories and files and
-writes to a local SQLite store. Reports that involve handling of local data,
-path traversal, or command execution are in scope.
+Hackatrak is a local-first tool that reads local git repositories and files.
+It writes a per-account SQLite store, and, when configured, a weekly note or
+spool files inside the Obsidian vault. Reports that involve handling of local
+data, path traversal, or command execution are in scope.

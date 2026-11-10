@@ -23,12 +23,20 @@ SQLite database — no accounts, no servers, nothing leaves your machine.
    bucket**, and an Obsidian **wikilink slug**.
 3. Activity is collapsed into day-level *presence*, summarized, and written to
    a local store.
-4. On a `writer` account, that same run splices one bullet per project into
-   today's weekday under that root's bucket in the weekly note. Each auto line
-   ends with an invisible `<!-- ht:<slug> -->` marker. A re-run replaces that
-   line and leaves unmarked lines alone. A missing week file is created from
-   `_templates/Weekly_note.md`. A `spooler` run and `sync --dry-run` do not
-   edit the note.
+4. What happens next depends on `role` in the config. A `writer` account (the
+   personal Mac) splices one bullet per project into today's weekday under that
+   root's bucket in the weekly note. The same run reads current-week spool
+   files and splices days labeled `SAP` or `SAP Business Network & ANT` into
+   that heading. Each auto line ends with an invisible `<!-- ht:<slug> -->`
+   marker. A re-run replaces that line and leaves unmarked lines alone. Spool
+   files are not deleted. A missing week file is created from
+   `_templates/Weekly_note.md` only when there is a bullet to write.
+5. A `spooler` account (the work Mac) writes only
+   `spool-<account>-<YYYY>-W<ww>.json` under `spool_dir` (default
+   `_Weekly/.hackatrak`). It never opens the weekly note. An unchanged spool
+   is left untouched, and an idle week does not replace an existing file.
+   `sync --dry-run` prints detected work and writes neither the note nor a
+   spool.
 
 ## Install
 
@@ -55,8 +63,8 @@ and move the `hackatrak` binary onto your `PATH`.
 ## Usage
 
 ```sh
-hackatrak sync          # scan, record presence, and splice writer bullets
-hackatrak sync --dry-run  # print detected work without writing
+hackatrak sync          # scan and record; writer splices, spooler writes a spool
+hackatrak sync --dry-run  # print detected work without writing the store, note, or spool
 hackatrak today         # (planned) what you worked on today
 hackatrak summary       # (planned) a rollup for a period
 hackatrak log           # (planned) recent presence entries
@@ -98,6 +106,7 @@ internal/derive/    Deriving presence from raw activity
 internal/summarize/ Mechanical day-level summarization
 internal/store/     SQLite persistence and migrations
 internal/query/     Today / week queries
+internal/spool/     Cross-account spool JSON: write, read, and discover
 internal/vault/     Weekly-note path, template fill, and marked-bullet splice
 ```
 

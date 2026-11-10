@@ -18,6 +18,9 @@ account = "hackastak"
 # role: "writer" or "spooler".
 # writer splices bullets into the weekly note.
 # spooler writes only its spool file and never edits the note.
+# The writer splices spool days whose bucket is "SAP" or
+# "SAP Business Network & ANT" into the SAP heading. Any other spool
+# bucket is logged and skipped. Spool files are not deleted.
 role = "writer"
 
 # spool_dir: directory for cross-account spool files, inside the vault.

@@ -20,10 +20,16 @@ release (`v0.1.0`). Until then it all lives under _Unreleased_.
 - `sync` command: scans configured repositories, collapses git and file
   activity into per-day presence, and persists it to the local store.
 - Writer-role `sync` splices one marked bullet per project into today's
-  weekday of that root's weekly-note bucket. A re-run replaces the marked
-  line and leaves hand-written lines alone. A missing week file is created
-  from `_templates/Weekly_note.md`. A spooler run and `--dry-run` do not
-  edit the note.
+  weekday of that root's weekly-note bucket. It also splices current-week
+  spool days labeled `SAP` or `SAP Business Network & ANT` into that heading
+  and skips any other spool heading. A re-run replaces the marked line and
+  leaves hand-written lines alone. Spool files are left in place. A missing
+  week file is created from `_templates/Weekly_note.md` only when there is
+  something to write. `--dry-run` does not edit the note.
+- Spooler-role `sync` writes this account's ISO week to
+  `spool-<account>-<YYYY>-W<ww>.json` under `spool_dir` (default
+  `_Weekly/.hackatrak`) and never opens the weekly note. An unchanged file
+  is not rewritten. An idle week leaves an existing spool where it is.
 - Repository scanning: resolves a project from the nearest git root (falling
   back to the first path segment), derives the life bucket and Obsidian
   wikilink slug from the project path, and tracks a cursor so each run only
