@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Local wall-clock schedule. There is no TimeZone key, so launchd uses the
+  system timezone and follows DST. If the Mac is asleep at 12:00 or 23:00,
+  launchd runs that missed interval once on wake. Catch-up is one sync, not
+  a replay of earlier days. RunAtLoad is omitted so loading the agent does
+  not splice a note.
+-->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>{{.Label | xml}}</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>{{.Program | xml}}</string>
+		<string>sync</string>
+	</array>
+	<key>StartCalendarInterval</key>
+	<array>
+		<dict>
+			<key>Hour</key>
+			<integer>12</integer>
+			<key>Minute</key>
+			<integer>0</integer>
+		</dict>
+		<dict>
+			<key>Hour</key>
+			<integer>23</integer>
+			<key>Minute</key>
+			<integer>0</integer>
+		</dict>
+	</array>
+	<key>StandardOutPath</key>
+	<string>{{.Stdout | xml}}</string>
+	<key>StandardErrorPath</key>
+	<string>{{.Stderr | xml}}</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		{{- range .Env}}
+		<key>{{.Key | xml}}</key>
+		<string>{{.Value | xml}}</string>
+		{{- end}}
+	</dict>
+	<key>ProcessType</key>
+	<string>Background</string>
+</dict>
+</plist>

@@ -16,6 +16,13 @@ release (`v0.1.0`). Until then it all lives under _Unreleased_.
 
 ### Added
 
+- `hackatrak install` writes a per-user LaunchAgent
+  (`~/Library/LaunchAgents/com.hackastak.hackatrak.plist`) that runs `sync`
+  at 12:00 and 23:00 local time, then loads it with `launchctl bootstrap`
+  (legacy `launchctl load -w` fallback). Logs go to
+  `~/Library/Logs/hackatrak/`. A missed fire runs once on wake. The scheduled
+  program is the absolute path of the binary you install, not a bare name.
+- `hackatrak uninstall` unloads that agent and removes its plist.
 - Local-first work-log core backed by SQLite (`modernc.org/sqlite`, no CGo).
 - `sync` command: scans configured repositories, collapses git and file
   activity into per-day presence, and persists it to the local store.
@@ -42,7 +49,7 @@ release (`v0.1.0`). Until then it all lives under _Unreleased_.
 - TOML configuration with schema validation (`config.example.toml`).
 - `version` command reporting the build version and git commit, injected at
   build time via `-ldflags`.
-- `today`, `summary`, `log`, and `install` command stubs (not yet implemented).
+- `today`, `summary`, and `log` command stubs (not yet implemented).
 
 ### Project infrastructure
 

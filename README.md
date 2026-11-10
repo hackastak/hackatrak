@@ -10,9 +10,9 @@ repositories and files you actually touch, collapses that activity into a
 per-day record of where your effort went, and keeps everything in a local
 SQLite database — no accounts, no servers, nothing leaves your machine.
 
-> **Status:** early development (`0.x`). The `sync` and `version` commands work;
-> `today`, `summary`, `log`, and `install` are stubs. Interfaces may change
-> before `v1.0.0`.
+> **Status:** early development (`0.x`). The `sync`, `install`, `uninstall`, and
+> `version` commands work; `today`, `summary`, and `log` are stubs. Interfaces
+> may change before `v1.0.0`.
 
 ## How it works
 
@@ -65,11 +65,86 @@ and move the `hackatrak` binary onto your `PATH`.
 ```sh
 hackatrak sync          # scan and record; writer splices, spooler writes a spool
 hackatrak sync --dry-run  # print detected work without writing the store, note, or spool
+hackatrak install       # load the 12:00 and 23:00 launchd agent (macOS)
+hackatrak uninstall     # unload and remove that agent
 hackatrak today         # (planned) what you worked on today
 hackatrak summary       # (planned) a rollup for a period
 hackatrak log           # (planned) recent presence entries
 hackatrak version       # print build version and commit
 ```
+
+## Scheduled runs (macOS)
+
+Hackatrak is meant to run itself twice a day. `hackatrak install` writes a
+per-user LaunchAgent and loads it. The agent runs `sync` at **12:00** and
+**23:00** local time.
+
+The plist has no `TimeZone` key, so launchd uses the system timezone and
+follows DST. If the Mac is asleep at either time, launchd runs that missed
+interval once on wake. Catch-up is a normal `sync`: it records today's work
+and splices today's bullets. It does not replay earlier days.
+
+Loading the agent does not run `sync` immediately (`RunAtLoad` is off). Logs:
+
+- `~/Library/Logs/hackatrak/sync.out.log`
+- `~/Library/Logs/hackatrak/sync.err.log`
+
+### Install the agent
+
+Install the binary first. `hackatrak install` records the absolute path of
+the binary you run, because launchd does not use your shell `PATH`. It also
+records that `PATH` so the scheduled job can still find `git`.
+
+```sh
+make install          # ~/.local/bin/hackatrak
+hackatrak install
+```
+
+Check it, and run one sync now:
+
+```sh
+launchctl print gui/$(id -u)/com.hackastak.hackatrak
+launchctl start com.hackastak.hackatrak
+tail -n 40 ~/Library/Logs/hackatrak/sync.out.log
+```
+
+Remove it:
+
+```sh
+hackatrak uninstall
+```
+
+`install` prefers `launchctl bootstrap`. If that subcommand is missing, it
+falls back to `launchctl load -w`. A reinstall boots the job out first so
+the new plist is the one that is loaded.
+
+### Manual load
+
+The template is
+[`internal/launchd/com.hackastak.hackatrak.plist.tmpl`](internal/launchd/com.hackastak.hackatrak.plist.tmpl).
+Substitute the absolute binary path, both log paths, and `PATH`, then:
+
+```sh
+mkdir -p ~/Library/LaunchAgents ~/Library/Logs/hackatrak
+cp /path/to/filled.plist ~/Library/LaunchAgents/com.hackastak.hackatrak.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.hackastak.hackatrak.plist
+```
+
+Older macOS:
+
+```sh
+launchctl load -w ~/Library/LaunchAgents/com.hackastak.hackatrak.plist
+```
+
+Unload without the CLI:
+
+```sh
+launchctl bootout gui/$(id -u)/com.hackastak.hackatrak
+rm ~/Library/LaunchAgents/com.hackastak.hackatrak.plist
+```
+
+`launchctl unload -w ~/Library/LaunchAgents/com.hackastak.hackatrak.plist` is
+the legacy equivalent.
 
 ## Configuration
 
@@ -108,6 +183,7 @@ internal/store/     SQLite persistence and migrations
 internal/query/     Today / week queries
 internal/spool/     Cross-account spool JSON: write, read, and discover
 internal/vault/     Weekly-note path, template fill, and marked-bullet splice
+internal/launchd/   LaunchAgent plist template and launchctl load/unload
 ```
 
 ## License

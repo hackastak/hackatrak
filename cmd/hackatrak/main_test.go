@@ -28,7 +28,7 @@ func TestRootRegistersPhase0Subcommands(t *testing.T) {
 	for _, cmd := range root.Commands() {
 		got[cmd.Name()] = true
 	}
-	for _, name := range []string{"sync", "today", "summary", "log", "install", "version"} {
+	for _, name := range []string{"sync", "today", "summary", "log", "install", "uninstall", "version"} {
 		if !got[name] {
 			t.Errorf("root is missing subcommand %q", name)
 		}
@@ -40,7 +40,7 @@ func TestStubSubcommandsPrintPlaceholder(t *testing.T) {
 	t.Setenv("HOME", home)
 	writeValidConfig(t, home)
 
-	for _, name := range []string{"today", "summary", "log", "install"} {
+	for _, name := range []string{"today", "summary", "log"} {
 		t.Run(name, func(t *testing.T) {
 			out, err := execute(t, name)
 			if err != nil {

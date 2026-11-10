@@ -21,7 +21,8 @@ type appState struct {
 // Version must run even when config is missing. A bad config fails before the
 // database is created, so the first successful run is what migrates the schema.
 func prepare(cmd *cobra.Command, _ []string) error {
-	if cmd.Name() == "version" {
+	switch cmd.Name() {
+	case "version", "install", "uninstall":
 		return nil
 	}
 
