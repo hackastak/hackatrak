@@ -1,8 +1,8 @@
 // Package spool defines the cross-account handoff file.
 //
-// A spooler writes one JSON file per ISO week. A writer reads it later and
-// splices the days into the weekly note. This package does not touch the note
-// and does not create the file.
+// A spooler writes one JSON file per ISO week. A writer discovers and reads
+// the week's files later, then splices those days into the weekly note.
+// This package never reads or writes the note.
 package spool
 
 import (

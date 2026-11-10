@@ -18,26 +18,34 @@ import (
 	"github.com/hackastak/hackatrak/internal/vault"
 )
 
-// noteBullet is one own-bucket line ready to splice. Text has no marker;
-// the vault writer appends <!-- ht:<slug> -->.
+// noteBullet is one line ready to splice or spool. Text has no marker;
+// the vault writer appends <!-- ht:<slug> -->. Day is YYYY-MM-DD.
 type noteBullet struct {
+	Day    string
 	Bucket string
 	Slug   string
+	Ticket string
 	Text   string
 }
 
-// writeOwnBuckets splices today's bullets for the writer role.
-// A spooler returns without reading or creating the weekly note. Only
-// buckets named by this config's roots are written. An idle day does not
+// writeOwnBuckets splices the writer role's note.
+// Today's own-bucket bullets are merged with current-week spool days for
+// the SAP heading. A spooler must not call this. An idle sync does not
 // create a missing week file. dry-run never reaches this function.
 func writeOwnBuckets(cfg config.Config, db *store.DB, now time.Time, logw io.Writer) (int, error) {
 	if cfg.Role != config.RoleWriter {
 		return 0, nil
 	}
-	bullets, err := ownBullets(cfg, db, now)
+	own, err := ownBullets(cfg, db, now)
 	if err != nil {
 		return 0, err
 	}
+	logger := log.New(logw, "", 0)
+	remote, err := spoolBullets(cfg, now, logger)
+	if err != nil {
+		return 0, err
+	}
+	bullets := mergeNoteBullets(own, remote)
 	if len(bullets) == 0 {
 		return 0, nil
 	}
@@ -45,15 +53,18 @@ func writeOwnBuckets(cfg config.Config, db *store.DB, now time.Time, logw io.Wri
 	if err != nil {
 		return 0, fmt.Errorf("sync: %w", err)
 	}
-	logger := log.New(logw, "", 0)
 	wrote := 0
 	for _, bullet := range bullets {
+		when, err := bulletTime(bullet.Day, now)
+		if err != nil {
+			return 0, err
+		}
 		before, err := os.ReadFile(path)
 		if err != nil {
 			return 0, fmt.Errorf("sync: read note: %w", err)
 		}
 		err = vault.WriteAtomic(path, func(note string) (string, error) {
-			return vault.Splice(note, bullet.Bucket, now, vault.Bullet{
+			return vault.Splice(note, bullet.Bucket, when, vault.Bullet{
 				Slug: bullet.Slug,
 				Text: bullet.Text,
 			}, vault.SpliceOptions{
@@ -76,6 +87,20 @@ func writeOwnBuckets(cfg config.Config, db *store.DB, now time.Time, logw io.Wri
 }
 
 func ownBullets(cfg config.Config, db *store.DB, now time.Time) ([]noteBullet, error) {
+	return bulletsFor(cfg, db, now, func(at time.Time) bool {
+		return sameLocalDay(at, now)
+	})
+}
+
+func weekBullets(cfg config.Config, db *store.DB, now time.Time) ([]noteBullet, error) {
+	year, week := now.ISOWeek()
+	return bulletsFor(cfg, db, now, func(at time.Time) bool {
+		gotYear, gotWeek := at.In(now.Location()).ISOWeek()
+		return gotYear == year && gotWeek == week
+	})
+}
+
+func bulletsFor(cfg config.Config, db *store.DB, now time.Time, keep func(time.Time) bool) ([]noteBullet, error) {
 	summarizer, err := summarize.FromConfig(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("sync: %w", err)
@@ -92,8 +117,8 @@ func ownBullets(cfg config.Config, db *store.DB, now time.Time) ([]noteBullet, e
 		if err != nil {
 			return nil, fmt.Errorf("sync: %w", err)
 		}
-		today := eventsOnDay(events, now)
-		if len(today) == 0 {
+		selected := eventsKept(events, keep)
+		if len(selected) == 0 {
 			continue
 		}
 		project, err := scan.ResolveProject(path, roots)
@@ -107,7 +132,7 @@ func ownBullets(cfg config.Config, db *store.DB, now time.Time) ([]noteBullet, e
 		if _, ok := own[bucket]; !ok {
 			continue
 		}
-		filled := withSlug(today, project.Slug)
+		filled := withSlug(selected, project.Slug)
 		rows, err := derive.FromEvents(filled, now.Location())
 		if err != nil {
 			return nil, fmt.Errorf("sync: %w", err)
@@ -128,13 +153,18 @@ func ownBullets(cfg config.Config, db *store.DB, now time.Time) ([]noteBullet, e
 				continue
 			}
 			bullets = append(bullets, noteBullet{
+				Day:    row.Day,
 				Bucket: bucket,
 				Slug:   project.Slug,
+				Ticket: summary.Ticket,
 				Text:   text,
 			})
 		}
 	}
 	sort.Slice(bullets, func(i, j int) bool {
+		if bullets[i].Day != bullets[j].Day {
+			return bullets[i].Day < bullets[j].Day
+		}
 		if bullets[i].Bucket != bullets[j].Bucket {
 			return bullets[i].Bucket < bullets[j].Bucket
 		}
@@ -183,15 +213,45 @@ func ownBuckets(cfg config.Config) map[string]struct{} {
 	return own
 }
 
-func eventsOnDay(events []store.Event, now time.Time) []store.Event {
-	today := make([]store.Event, 0, len(events))
+func eventsKept(events []store.Event, keep func(time.Time) bool) []store.Event {
+	kept := make([]store.Event, 0, len(events))
 	for _, event := range events {
-		if !sameLocalDay(event.OccurredAt, now) {
+		if keep != nil && !keep(event.OccurredAt) {
 			continue
 		}
-		today = append(today, event)
+		kept = append(kept, event)
 	}
-	return today
+	return kept
+}
+
+func bulletTime(day string, now time.Time) (time.Time, error) {
+	if strings.TrimSpace(day) == "" {
+		return now, nil
+	}
+	parsed, err := time.ParseInLocation("2006-01-02", day, now.Location())
+	if err != nil {
+		return time.Time{}, fmt.Errorf("sync: day %q: %w", day, err)
+	}
+	return parsed, nil
+}
+
+func mergeNoteBullets(own, remote []noteBullet) []noteBullet {
+	ownKey := make(map[string]struct{}, len(own))
+	for _, bullet := range own {
+		ownKey[bulletKey(bullet)] = struct{}{}
+	}
+	merged := make([]noteBullet, 0, len(own)+len(remote))
+	for _, bullet := range remote {
+		if _, ok := ownKey[bulletKey(bullet)]; ok {
+			continue
+		}
+		merged = append(merged, bullet)
+	}
+	return append(merged, own...)
+}
+
+func bulletKey(bullet noteBullet) string {
+	return bullet.Day + "\x00" + bullet.Bucket + "\x00" + bullet.Slug
 }
 
 func withSlug(events []store.Event, slug string) []store.Event {

@@ -27,8 +27,8 @@ func newSyncCmd() *cobra.Command {
 
 // runSync collects git commits and file-mtime presence. A repo with a commit
 // today is not also recorded as a file-touch. The writer role then splices
-// today's bullets into its own buckets only. A spooler does not touch the
-// weekly note. --dry-run stops at printing.
+// today's own bullets and any current-week spool days into the note. A
+// spooler writes only its spool file. --dry-run stops at printing.
 func runSync(cmd *cobra.Command, dryRun bool) error {
 	state, err := appFrom(cmd)
 	if err != nil {
@@ -42,7 +42,7 @@ func runSync(cmd *cobra.Command, dryRun bool) error {
 	if dryRun {
 		return printCollect(cmd.OutOrStdout(), collected, true, 0)
 	}
-	wrote, err := writeOwnBuckets(state.cfg, state.db, now, cmd.ErrOrStderr())
+	wrote, err := publishSync(state.cfg, state.db, now, cmd.ErrOrStderr())
 	if err != nil {
 		return err
 	}

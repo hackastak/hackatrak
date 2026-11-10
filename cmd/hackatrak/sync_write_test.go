@@ -41,15 +41,16 @@ func TestSyncWriterSplicesOwnBucketOnly(t *testing.T) {
 
 	note := readNote(t, notePath)
 	want := "- [[demo]] (NEXTGEN-42): wire the writer <!-- ht:demo -->"
-	sunday := weekdaySection(t, note, "Hackastak", "Sunday")
-	if !strings.Contains(sunday, want) {
-		t.Fatalf("Hackastak Sunday = %q, want %s", sunday, want)
+	today := time.Now().Weekday().String()
+	section := weekdaySection(t, note, "Hackastak", today)
+	if !strings.Contains(section, want) {
+		t.Fatalf("Hackastak %s = %q, want %s", today, section, want)
 	}
 	if strings.Count(note, "<!-- ht:demo -->") != 1 {
 		t.Fatalf("demo marker count = %d, want 1\n%s", strings.Count(note, "<!-- ht:demo -->"), note)
 	}
-	if !strings.Contains(sunday, "condense commit subjects into one line <!-- ht:hackatrak -->") {
-		t.Fatalf("hand-written Sunday line was not preserved:\n%s", sunday)
+	if today == "Sunday" && !strings.Contains(section, "condense commit subjects into one line <!-- ht:hackatrak -->") {
+		t.Fatalf("hand-written Sunday line was not preserved:\n%s", section)
 	}
 	if bucketSection(note, "SAP Business Network & ANT") != bucketSection(string(before), "SAP Business Network & ANT") {
 		t.Fatalf("SAP bucket changed:\n%s", bucketSection(note, "SAP Business Network & ANT"))
@@ -90,12 +91,8 @@ func TestSyncWriterReplacesMarkedLine(t *testing.T) {
 		t.Fatal(err)
 	}
 	notePath := placeWeekFixture(t, vaultPath, "2026-W45.md")
-	stale := readNote(t, notePath)
-	stale = strings.Replace(stale,
-		"- Hackatrak: set up production repo infra",
-		"- Hackatrak: set up production repo infra\n- [[demo]] (NEXTGEN-1): stale summary <!-- ht:demo -->",
-		1,
-	)
+	stale := insertUnderWeekday(t, readNote(t, notePath), "Hackastak", time.Now().Weekday().String(),
+		"- [[demo]] (NEXTGEN-1): stale summary <!-- ht:demo -->")
 	if err := os.WriteFile(notePath, []byte(stale), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -114,9 +111,10 @@ func TestSyncWriterReplacesMarkedLine(t *testing.T) {
 	if strings.Contains(note, "stale summary") {
 		t.Fatalf("stale marked line survived:\n%s", note)
 	}
-	sunday := weekdaySection(t, note, "Hackastak", "Sunday")
-	if !strings.Contains(sunday, "- [[demo]] (NEXTGEN-42): replace the marked line <!-- ht:demo -->") {
-		t.Fatalf("Sunday = %q", sunday)
+	today := time.Now().Weekday().String()
+	section := weekdaySection(t, note, "Hackastak", today)
+	if !strings.Contains(section, "- [[demo]] (NEXTGEN-42): replace the marked line <!-- ht:demo -->") {
+		t.Fatalf("%s = %q", today, section)
 	}
 	if !strings.Contains(note, "set up production repo infra") {
 		t.Fatal("unmarked line was removed")
@@ -156,9 +154,10 @@ func TestSyncWriterCreatesMissingWeek(t *testing.T) {
 	if !strings.Contains(note, weekMonday(time.Now()).Format("2006-01-02")) {
 		t.Fatalf("created note missing Monday date:\n%s", note)
 	}
-	sunday := weekdaySection(t, note, "Hackastak", "Sunday")
-	if !strings.Contains(sunday, "- [[demo]]: create the week file <!-- ht:demo -->") {
-		t.Fatalf("Hackastak Sunday = %q", sunday)
+	today := time.Now().Weekday().String()
+	section := weekdaySection(t, note, "Hackastak", today)
+	if !strings.Contains(section, "- [[demo]]: create the week file <!-- ht:demo -->") {
+		t.Fatalf("Hackastak %s = %q", today, section)
 	}
 	if strings.Contains(bucketSection(note, "SAP Business Network & ANT"), "ht:demo") {
 		t.Fatalf("missing-week create wrote the own-bucket bullet into SAP:\n%s", note)
@@ -189,9 +188,10 @@ func TestSyncWriterFileOnlyBullet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sunday := weekdaySection(t, readNote(t, notePath), "Hackastak", "Sunday")
-	if !strings.Contains(sunday, "- [[demo]]: touched 1 file (main.go) <!-- ht:demo -->") {
-		t.Fatalf("Sunday = %q, want file fallback bullet", sunday)
+	today := time.Now().Weekday().String()
+	section := weekdaySection(t, readNote(t, notePath), "Hackastak", today)
+	if !strings.Contains(section, "- [[demo]]: touched 1 file (main.go) <!-- ht:demo -->") {
+		t.Fatalf("%s = %q, want file fallback bullet", today, section)
 	}
 }
 
@@ -232,8 +232,9 @@ func TestSyncWriterKeepsBucketsSeparate(t *testing.T) {
 		t.Fatal(err)
 	}
 	note := readNote(t, notePath)
-	hack := weekdaySection(t, note, "Hackastak", "Sunday")
-	sap := weekdaySection(t, note, "SAP Business Network & ANT", "Sunday")
+	today := time.Now().Weekday().String()
+	hack := weekdaySection(t, note, "Hackastak", today)
+	sap := weekdaySection(t, note, "SAP Business Network & ANT", today)
 	if !strings.Contains(hack, "<!-- ht:demo -->") || strings.Contains(hack, "ht:supply-chain-monitor") {
 		t.Fatalf("Hackastak Sunday = %q", hack)
 	}
@@ -429,6 +430,21 @@ func weekdaySection(t *testing.T, note, bucket, weekday string) string {
 		}
 	}
 	return strings.Join(lines[start:end], "\n")
+}
+
+func insertUnderWeekday(t *testing.T, note, bucket, weekday, line string) string {
+	t.Helper()
+	body := bucketSection(note, bucket)
+	idx := strings.Index(note, body)
+	if idx < 0 || body == "" {
+		t.Fatalf("bucket %s missing", bucket)
+	}
+	rel := strings.Index(body, "\n"+weekday+"\n")
+	if rel < 0 {
+		t.Fatalf("weekday %s missing under %s", weekday, bucket)
+	}
+	at := idx + rel + len("\n"+weekday+"\n")
+	return note[:at] + line + "\n" + note[at:]
 }
 
 func weekMonday(day time.Time) time.Time {
