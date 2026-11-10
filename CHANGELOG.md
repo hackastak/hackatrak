@@ -65,6 +65,11 @@ release (`v0.1.0`). Until then it all lives under _Unreleased_.
   counts to stderr.
 - Usage errors (unknown command or flag, bad arguments, bad `--date`) exit 2.
   Config, scan, and write failures exit 1. Success exits 0.
+- README usage now includes the full config reference: every field, its
+  default, and the writer versus spooler account files.
+- `sync` no longer aborts the whole run when a file touch is stored on a
+  scan root that is not itself a project. That path is skipped and logged.
+  Repo bullets still land.
 
 ### Project infrastructure
 

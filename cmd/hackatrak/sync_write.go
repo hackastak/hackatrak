@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -36,11 +37,11 @@ func writeOwnBuckets(cfg config.Config, db *store.DB, now time.Time, logw io.Wri
 	if cfg.Role != config.RoleWriter {
 		return 0, nil
 	}
-	own, err := ownBullets(cfg, db, now)
+	logger := log.New(logw, "", 0)
+	own, err := ownBullets(cfg, db, now, logger)
 	if err != nil {
 		return 0, err
 	}
-	logger := log.New(logw, "", 0)
 	remote, err := spoolBullets(cfg, now, logger)
 	if err != nil {
 		return 0, err
@@ -86,21 +87,21 @@ func writeOwnBuckets(cfg config.Config, db *store.DB, now time.Time, logw io.Wri
 	return wrote, nil
 }
 
-func ownBullets(cfg config.Config, db *store.DB, now time.Time) ([]noteBullet, error) {
-	return bulletsFor(cfg, db, now, func(at time.Time) bool {
+func ownBullets(cfg config.Config, db *store.DB, now time.Time, logger *log.Logger) ([]noteBullet, error) {
+	return bulletsFor(cfg, db, now, logger, func(at time.Time) bool {
 		return sameLocalDay(at, now)
 	})
 }
 
-func weekBullets(cfg config.Config, db *store.DB, now time.Time) ([]noteBullet, error) {
+func weekBullets(cfg config.Config, db *store.DB, now time.Time, logger *log.Logger) ([]noteBullet, error) {
 	year, week := now.ISOWeek()
-	return bulletsFor(cfg, db, now, func(at time.Time) bool {
+	return bulletsFor(cfg, db, now, logger, func(at time.Time) bool {
 		gotYear, gotWeek := at.In(now.Location()).ISOWeek()
 		return gotYear == year && gotWeek == week
 	})
 }
 
-func bulletsFor(cfg config.Config, db *store.DB, now time.Time, keep func(time.Time) bool) ([]noteBullet, error) {
+func bulletsFor(cfg config.Config, db *store.DB, now time.Time, logger *log.Logger, keep func(time.Time) bool) ([]noteBullet, error) {
 	summarizer, err := summarize.FromConfig(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("sync: %w", err)
@@ -122,6 +123,12 @@ func bulletsFor(cfg config.Config, db *store.DB, now time.Time, keep func(time.T
 			continue
 		}
 		project, err := scan.ResolveProject(path, roots)
+		if errors.Is(err, scan.ErrNoProject) {
+			if logger != nil {
+				logger.Printf("sync: skip %s: no project", path)
+			}
+			continue
+		}
 		if err != nil {
 			return nil, fmt.Errorf("sync: project %s: %w", path, err)
 		}

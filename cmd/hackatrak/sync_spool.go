@@ -37,7 +37,7 @@ func publishSync(cfg config.Config, db *store.DB, now time.Time, logw io.Writer)
 // summarized day-presence. It does not read or create the weekly note.
 // An idle week leaves any existing spool where it is.
 func writeSpool(cfg config.Config, db *store.DB, now time.Time, logw io.Writer) error {
-	bullets, err := weekBullets(cfg, db, now)
+	bullets, err := weekBullets(cfg, db, now, log.New(logw, "", 0))
 	if err != nil {
 		return err
 	}

@@ -195,6 +195,67 @@ func TestSyncWriterFileOnlyBullet(t *testing.T) {
 	}
 }
 
+func TestSyncWriterSkipsScanRootTouch(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	vaultPath := filepath.Join(home, "vault")
+	root := filepath.Join(home, "Developer")
+	repo := filepath.Join(root, "demo")
+	if err := os.MkdirAll(filepath.Join(root, "LORIEN"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(repo, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	copyWeeklyTemplate(t, vaultPath)
+	gitCmd(t, repo, "init", "-b", "main")
+	gitCommitAt(t, repo, commitOnToday(-time.Minute), "me@example.com", "Me", "personal work")
+	if err := os.WriteFile(filepath.Join(root, "LORIEN", "runs.tsv"), []byte("run\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeWriterConfig(t, home, vaultPath, root, "Hackastak")
+	dbPath, err := store.DefaultPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.InsertEvent(store.Event{
+		Kind:       store.KindFileTouch,
+		RepoPath:   root,
+		OccurredAt: time.Now(),
+		FileCount:  1,
+		FileSample: "runs.tsv",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := execute(t, "sync")
+	if err != nil {
+		t.Fatalf("sync: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "no project") {
+		t.Fatalf("output = %q, want a skipped scan-root touch", out)
+	}
+	notePath, err := vault.NotePath(vaultPath, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	today := time.Now().Weekday().String()
+	section := weekdaySection(t, readNote(t, notePath), "Hackastak", today)
+	if !strings.Contains(section, "<!-- ht:demo -->") {
+		t.Fatalf("%s = %q, want the repo bullet despite the loose file", today, section)
+	}
+	if strings.Contains(section, "ht:Developer") || strings.Contains(section, "runs.tsv") {
+		t.Fatalf("%s spliced the scan root:\n%s", today, section)
+	}
+}
+
 func TestSyncWriterKeepsBucketsSeparate(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

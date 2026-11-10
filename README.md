@@ -19,7 +19,9 @@ SQLite database — no accounts, no servers, nothing leaves your machine.
    `~/.config/hackatrak/config.toml`).
 2. `hackatrak sync` walks those trees, reads git history and file modification
    times, and resolves each path to a **project** (nearest git root), a **life
-   bucket**, and an Obsidian **wikilink slug**.
+   bucket**, and an Obsidian **wikilink slug**. A file touch stored on a scan
+   root that is not itself a project is skipped and logged. It does not abort
+   the run, and it does not become a bullet.
 3. Activity is collapsed into day-level *presence*, summarized, and written to
    a local store.
 4. What happens next depends on `role` in the config. A `writer` account (the
@@ -168,7 +170,8 @@ so a review cannot rewind the scan cursor.
 
 `--verbose` (`-v`) writes three lines to stderr: the day, `mode dry-run` or
 `mode write`, and the detected commit and file-touch counts. The stdout
-summary is unchanged.
+summary is unchanged. A skipped scan root is also logged to stderr, with or
+without `--verbose`: `sync: skip <path>: no project`.
 
 ## Scheduled runs (macOS)
 
@@ -245,15 +248,99 @@ the legacy equivalent.
 
 ## Configuration
 
-Hackatrak reads a TOML config file. Copy the example and edit it:
+Hackatrak reads one TOML file, `~/.config/hackatrak/config.toml`. `~` in the
+config path and in path values is expanded. Unknown keys are an error, and a
+parse or validation error names the field and, when the parser knows it, the
+source line. There is no `--config` flag. One file per macOS account.
+
+The SQLite store is not in this file. It is always
+`~/.local/state/hackatrak/hackatrak.db`, created on the first command that
+opens it. Keep that file local. Do not put it in the vault.
 
 ```sh
 mkdir -p ~/.config/hackatrak
 cp config.example.toml ~/.config/hackatrak/config.toml
 ```
 
-See [`config.example.toml`](config.example.toml) for the full set of options
-and inline documentation.
+[`config.example.toml`](config.example.toml) is the same reference with the
+comments inline. The personal account is the writer. The work account is the
+spooler and must not set `role` to `"writer"`.
+
+### Fields
+
+| Field | Required | Default | Meaning |
+| --- | --- | --- | --- |
+| `vault_path` | yes | none | Obsidian vault. Must be an existing directory. |
+| `weekly_glob` | no | `_Weekly/{YYYY}/{YYYY}-W{ww}.md` | Week-file path relative to the vault. `{YYYY}` and `{ww}` are filled when the week is resolved, not at load. |
+| `account` | yes | none | This macOS account. One filename segment: letters, digits, `.`, `_`, `-`. It must not contain `..`. Used in `spool-<account>-<YYYY>-W<ww>.json`. |
+| `role` | yes | none | `writer` or `spooler`. |
+| `spool_dir` | no | `_Weekly/.hackatrak` | Cross-account spool directory. It must sit inside the vault, must not contain `..`, and does not need to exist yet. A relative path is joined to `vault_path`. `~` is expanded. |
+| `ticket_regex` | no | none | Tried against the branch name, then the commit message. No match omits the parentheses in the bullet. |
+| `exclude_globs` | no | none | Extra mtime-scan ignores, on top of the built-ins below. |
+| `summarizer` | no | `mechanical` | `mechanical` or `ollama`. `ollama` is accepted and returns an error until that summarizer is implemented. |
+| `roots` | yes | none | One or more `{ path, bucket }` tables. |
+| `roots[].path` | yes | none | Existing directory. Only this account's trees. |
+| `roots[].bucket` | yes | none | Weekly-note heading for that path prefix. |
+| `git.author_emails` | no | none | Commits by other addresses are ignored. An empty list records no commits. |
+
+Built-in mtime excludes, always on, are `.git/`, build-output directories
+(`node_modules`, `vendor`, `dist`, `build`, `target`, `coverage`, `.next`,
+`.turbo`, `__pycache__`), `*.swp`, `*~`, `.DS_Store`, `*.o`, `*.pyc`, and
+`*.class`. A pattern in `exclude_globs` that contains `/` matches the path
+relative to the walk root. Any other pattern matches the file or directory
+name. `*` does not cross a separator. `.gitignore` files are always honored
+and are not a config field.
+
+`role = "writer"` splices one marked bullet per project into today's weekday
+under that root's bucket. The same run reads every current-week spool file
+and splices a day whose bucket is `SAP` or `SAP Business Network & ANT` into
+the `SAP Business Network & ANT` heading. Any other spool bucket is logged
+and skipped. Spool files are not deleted. Only the writer opens the weekly
+note.
+
+`role = "spooler"` writes only its own spool file and never opens the note.
+An unchanged spool is left untouched. An idle week does not replace an
+existing spool.
+
+### Personal account (`hackastak`)
+
+```toml
+vault_path = "~/Developer/My_Notes"
+account = "hackastak"
+role = "writer"
+spool_dir = "_Weekly/.hackatrak"
+ticket_regex = 'NEXTGEN-\\d+'
+summarizer = "mechanical"
+
+[[roots]]
+path = "~/Developer"
+bucket = "Hackastak"
+
+[git]
+author_emails = ["you@example.com"]
+```
+
+### Work account (`i568439`)
+
+Copy this to `~/.config/hackatrak/config.toml` on the work Mac, then
+`make install` and `hackatrak install`. Do not install this role on the
+personal account.
+
+```toml
+vault_path = "~/Developer/My_Notes"
+account = "i568439"
+role = "spooler"
+spool_dir = "_Weekly/.hackatrak"
+ticket_regex = 'NEXTGEN-\\d+'
+summarizer = "mechanical"
+
+[[roots]]
+path = "~/Developer"
+bucket = "SAP Business Network & ANT"
+
+[git]
+author_emails = ["you@example.com"]
+```
 
 ## Development
 
