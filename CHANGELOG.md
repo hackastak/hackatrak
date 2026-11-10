@@ -49,7 +49,22 @@ release (`v0.1.0`). Until then it all lives under _Unreleased_.
 - TOML configuration with schema validation (`config.example.toml`).
 - `version` command reporting the build version and git commit, injected at
   build time via `-ldflags`.
-- `today`, `summary`, and `log` command stubs (not yet implemented).
+- `hackatrak today` prints a table of today's per-project work from the
+  query layer. `hackatrak summary` rolls up that day, and `summary --week`
+  rolls up the current ISO week. Both accept `--json`. An idle period prints
+  `today: no work` or `summary: no work` instead of an empty table.
+- `hackatrak log "project: did X"` splices a manual bullet for today on the
+  writer account, using the same `<!-- ht:<slug> -->` marker as `sync`.
+  `project (TICKET): did X` adds the ticket parentheses. The project must be
+  a directory under a configured root. A spooler run is refused and does not
+  open the note. A second log for the same project replaces the line. The
+  manual line is not written to the store, so `today` does not repeat it.
+- `sync --date YYYY-MM-DD` previews one local day when combined with
+  `--dry-run`. A past date without `--dry-run`, a future date, or a malformed
+  date is a usage error. `--verbose` (`-v`) logs the day, mode, and scan
+  counts to stderr.
+- Usage errors (unknown command or flag, bad arguments, bad `--date`) exit 2.
+  Config, scan, and write failures exit 1. Success exits 0.
 
 ### Project infrastructure
 

@@ -36,6 +36,11 @@ SQLite database — no accounts, no servers, nothing leaves your machine.
    is left untouched, and an idle week does not replace an existing file.
    `sync --dry-run` prints detected work and writes neither the note nor a
    spool.
+6. `hackatrak today` and `hackatrak summary` read the local store. They do
+   not parse the weekly note. `hackatrak log` is the other direction: a
+   writer-only splice for work that left no git or file footprint. It does
+   not insert a store row, so review does not repeat a manual line unless
+   that project also has recorded presence.
 
 ## Install
 
@@ -62,19 +67,108 @@ and move the `hackatrak` binary onto your `PATH`.
 ## Usage
 
 ```sh
-hackatrak sync          # scan and record; writer splices, spooler writes a spool
-hackatrak sync --dry-run  # print detected work without writing the store, note, or spool
+hackatrak sync                         # scan and record; writer splices, spooler writes a spool
+hackatrak sync --dry-run               # print detected work without writing the store, note, or spool
 hackatrak sync --dry-run --date 2026-11-09  # limit that preview to one local day
-hackatrak sync -v         # log the day, mode, and scan counts to stderr
-hackatrak install       # load the 12:00 and 23:00 launchd agent (macOS)
-hackatrak uninstall     # unload and remove that agent
-hackatrak today         # print today's per-project work
-hackatrak today --json  # same review as JSON
-hackatrak summary       # roll up today; --week rolls up the current ISO week
-hackatrak summary --json
-hackatrak log "project: did X"  # splice a manual bullet for today
-hackatrak version       # print build version and commit
+hackatrak sync --verbose               # log the day, mode, and scan counts to stderr
+hackatrak today                        # table of today's per-project work
+hackatrak today --json                 # the same review as JSON
+hackatrak summary                      # today's rollup, with a project count
+hackatrak summary --week               # current ISO week, grouped by day
+hackatrak summary --week --json
+hackatrak log "project: did X"          # splice a manual bullet for today
+hackatrak log "project (NEXTGEN-1): did X"
+hackatrak install                      # load the 12:00 and 23:00 launchd agent (macOS)
+hackatrak uninstall                    # unload and remove that agent
+hackatrak version                      # print build version and commit
 ```
+
+Success exits 0. A bad flag, a bad argument, an unknown command, or a bad
+`--date` exits 2. Config, scan, and write failures exit 1. Errors go to
+stderr. Review text, JSON, and the `sync` summary go to stdout. `--verbose`
+and splice notes go to stderr.
+
+### Review
+
+`today` and `summary` read `internal/query` and turn each worked project-day
+into a line with the configured summarizer. Unworked rows are omitted. The
+table columns are `PROJECT`, `BUCKET`, `SOURCE`, `BRANCH`, `TICKET`, and
+`WORK`. An empty cell is `-`. Project is the wikilink slug.
+
+`today` prints the local date, then the table. No work prints `today: no work`.
+
+`summary` is the same day plus a count, `1 project` or `N projects`.
+`summary --week` prints the current ISO week (`2026-W46`), then one dated
+table per day that has work, then `N projects over D days`. No work prints
+`summary: no work`. `--week` does not take a week id. It is always the
+current local ISO week.
+
+`--json` replaces the table. `projects` is always an array, never null.
+A day document has `period`, `date`, `projects`, `project_count`, and
+`day_count`. A week document has `week` instead of `date`.
+
+```json
+{
+  "period": "day",
+  "date": "2026-11-10",
+  "projects": [
+    {
+      "day": "2026-11-10",
+      "project": "staksmith",
+      "bucket": "",
+      "source": "commit",
+      "branch": "main",
+      "ticket": "NEXTGEN-1",
+      "work": "rework docs flow"
+    }
+  ],
+  "project_count": 1,
+  "day_count": 1
+}
+```
+
+`bucket` is empty unless a project row was stored. v1 review does not join
+the `projects` table, so the column is usually `-` in the table and `""` in
+JSON. `work` is the summary clause only, not the weekly-note bullet.
+
+### Manual log
+
+`log` is for work that left no commit and no file touch. It splices today's
+weekday in the weekly note with the same marker `sync` uses, so a later sync
+for that project replaces the line instead of duplicating it. A second `log`
+for the same project replaces the marked line. Unmarked lines are left alone.
+A missing week file is created from the template.
+
+```sh
+hackatrak log "staksmith: paired the manual escape hatch"
+hackatrak log "staksmith (NEXTGEN-9): replaced the manual line"
+```
+
+The project name is the directory basename under a configured root, or a
+discovered git repo's basename. That match chooses the bucket. An unknown
+project, or the same slug under two buckets, is an error and does not write.
+A spooler account is refused: `log` does not open the weekly note and does
+not write a spool file.
+
+`log` does not record presence. `today` will not show the manual sentence
+unless a later `sync` has store rows for that project. Those rows produce
+the summarizer line, which then replaces the manual bullet.
+
+### Sync flags
+
+`--dry-run` prints detected commits and file touches and writes nothing: no
+store rows, no cursor advance, no note, no spool.
+
+`--date YYYY-MM-DD` is a local calendar day. Omit it, or pass today, and
+`sync` behaves as a normal run. A past day requires `--dry-run`. That preview
+is limited to the day's local midnight through the next midnight, so later
+commits and file touches are not listed. A future day, or any other shape,
+is a usage error. A past `--date` without `--dry-run` is also a usage error,
+so a review cannot rewind the scan cursor.
+
+`--verbose` (`-v`) writes three lines to stderr: the day, `mode dry-run` or
+`mode write`, and the detected commit and file-touch counts. The stdout
+summary is unchanged.
 
 ## Scheduled runs (macOS)
 
