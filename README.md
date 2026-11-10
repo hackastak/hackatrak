@@ -10,9 +10,8 @@ repositories and files you actually touch, collapses that activity into a
 per-day record of where your effort went, and keeps everything in a local
 SQLite database — no accounts, no servers, nothing leaves your machine.
 
-> **Status:** early development (`0.x`). The `sync`, `install`, `uninstall`, and
-> `version` commands work; `today`, `summary`, and `log` are stubs. Interfaces
-> may change before `v1.0.0`.
+> **Status:** early development (`0.x`). `sync`, `today`, `summary`, `log`, `install`,
+> `uninstall`, and `version` work. Interfaces may change before `v1.0.0`.
 
 ## How it works
 
@@ -65,11 +64,15 @@ and move the `hackatrak` binary onto your `PATH`.
 ```sh
 hackatrak sync          # scan and record; writer splices, spooler writes a spool
 hackatrak sync --dry-run  # print detected work without writing the store, note, or spool
+hackatrak sync --dry-run --date 2026-11-09  # limit that preview to one local day
+hackatrak sync -v         # log the day, mode, and scan counts to stderr
 hackatrak install       # load the 12:00 and 23:00 launchd agent (macOS)
 hackatrak uninstall     # unload and remove that agent
-hackatrak today         # (planned) what you worked on today
-hackatrak summary       # (planned) a rollup for a period
-hackatrak log           # (planned) recent presence entries
+hackatrak today         # print today's per-project work
+hackatrak today --json  # same review as JSON
+hackatrak summary       # roll up today; --week rolls up the current ISO week
+hackatrak summary --json
+hackatrak log "project: did X"  # splice a manual bullet for today
 hackatrak version       # print build version and commit
 ```
 

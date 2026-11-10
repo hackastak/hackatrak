@@ -36,6 +36,19 @@ type FileCollect struct {
 // excludeGlobs are extra patterns on top of the built-in mtime exclusions.
 // now must be non-zero. project detection fills the event slug later.
 func CollectFiles(db *store.DB, roots, excludeGlobs []string, now time.Time, dryRun bool, committedRepos []string) (FileCollect, error) {
+	return collectFiles(db, roots, excludeGlobs, now, time.Time{}, dryRun, committedRepos)
+}
+
+// CollectFilesUntil is CollectFiles limited to mtimes before until.
+// until is exclusive and must be after local midnight of now.
+func CollectFilesUntil(db *store.DB, roots, excludeGlobs []string, now, until time.Time, dryRun bool, committedRepos []string) (FileCollect, error) {
+	if until.IsZero() || !until.After(LocalMidnight(now)) {
+		return FileCollect{}, fmt.Errorf("collect files: until must be after the day's start")
+	}
+	return collectFiles(db, roots, excludeGlobs, now, until, dryRun, committedRepos)
+}
+
+func collectFiles(db *store.DB, roots, excludeGlobs []string, now, until time.Time, dryRun bool, committedRepos []string) (FileCollect, error) {
 	if db == nil {
 		return FileCollect{}, fmt.Errorf("collect files: database is required")
 	}
@@ -65,7 +78,7 @@ func CollectFiles(db *store.DB, roots, excludeGlobs []string, now time.Time, dry
 		result.Removed = removed
 	}
 
-	files, err := FilesSince(roots, LocalMidnight(now), excludeGlobs...)
+	files, err := filesInWindow(roots, LocalMidnight(now), until, excludeGlobs)
 	if err != nil {
 		return FileCollect{}, fmt.Errorf("collect files: %w", err)
 	}
@@ -90,6 +103,13 @@ func CollectFiles(db *store.DB, roots, excludeGlobs []string, now time.Time, dry
 		result.Inserted++
 	}
 	return result, nil
+}
+
+func filesInWindow(roots []string, since, until time.Time, excludeGlobs []string) ([]TouchedFile, error) {
+	if until.IsZero() {
+		return FilesSince(roots, since, excludeGlobs...)
+	}
+	return FilesBetween(roots, since, until, excludeGlobs...)
 }
 
 func discoverAll(roots []string) ([]string, error) {

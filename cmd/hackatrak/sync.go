@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -14,14 +15,18 @@ import (
 
 func newSyncCmd() *cobra.Command {
 	var dryRun bool
+	var verbose bool
+	var date string
 	cmd := &cobra.Command{
 		Use:   "sync",
 		Short: "Scan configured roots and record work",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runSync(cmd, dryRun)
+			return runSync(cmd, dryRun, verbose, date)
 		},
 	}
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print detected commits and file presence without recording them")
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "log the day, mode, and scan counts to stderr")
+	cmd.Flags().StringVar(&date, "date", "", "limit a dry-run to one local day (YYYY-MM-DD)")
 	return cmd
 }
 
@@ -29,24 +34,72 @@ func newSyncCmd() *cobra.Command {
 // today is not also recorded as a file-touch. The writer role then splices
 // today's own bullets and any current-week spool days into the note. A
 // spooler writes only its spool file. --dry-run stops at printing.
-func runSync(cmd *cobra.Command, dryRun bool) error {
+func runSync(cmd *cobra.Command, dryRun, verbose bool, date string) error {
 	state, err := appFrom(cmd)
 	if err != nil {
 		return err
 	}
-	now := time.Now()
-	collected, err := collectSync(state.cfg, state.db, now, dryRun)
+	when, err := resolveSyncWhen(date, dryRun)
 	if err != nil {
 		return err
 	}
+	logSync(cmd, verbose, "day %s", when.now.Format("2006-01-02"))
+	if dryRun {
+		logSync(cmd, verbose, "mode dry-run")
+	} else {
+		logSync(cmd, verbose, "mode write")
+	}
+	collected, err := collectSync(state.cfg, state.db, when, dryRun)
+	if err != nil {
+		return err
+	}
+	logSync(cmd, verbose, "detected %d commits, %d file touches", len(collected.git.Commits), len(collected.files.Touches))
 	if dryRun {
 		return printCollect(cmd.OutOrStdout(), collected, true, 0)
 	}
-	wrote, err := publishSync(state.cfg, state.db, now, cmd.ErrOrStderr())
+	wrote, err := publishSync(state.cfg, state.db, when.now, cmd.ErrOrStderr())
 	if err != nil {
 		return err
 	}
 	return printCollect(cmd.OutOrStdout(), collected, false, wrote)
+}
+
+type syncWhen struct {
+	now   time.Time
+	until time.Time
+}
+
+func resolveSyncWhen(date string, dryRun bool) (syncWhen, error) {
+	now := time.Now()
+	date = strings.TrimSpace(date)
+	if date == "" {
+		return syncWhen{now: now}, nil
+	}
+	parsed, err := time.ParseInLocation("2006-01-02", date, time.Local)
+	if err != nil {
+		return syncWhen{}, usagef("sync: --date must be YYYY-MM-DD")
+	}
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	if parsed.After(today) {
+		return syncWhen{}, usagef("sync: --date %s is in the future", date)
+	}
+	if parsed.Equal(today) {
+		return syncWhen{now: now}, nil
+	}
+	if !dryRun {
+		return syncWhen{}, usagef("sync: --date before today requires --dry-run")
+	}
+	return syncWhen{
+		now:   parsed.Add(24*time.Hour - time.Second),
+		until: parsed.Add(24 * time.Hour),
+	}, nil
+}
+
+func logSync(cmd *cobra.Command, verbose bool, format string, args ...any) {
+	if !verbose || cmd == nil {
+		return
+	}
+	fmt.Fprintf(cmd.ErrOrStderr(), "sync: "+format+"\n", args...)
 }
 
 type syncCollect struct {
@@ -54,12 +107,23 @@ type syncCollect struct {
 	files scan.FileCollect
 }
 
-func collectSync(cfg config.Config, db *store.DB, now time.Time, dryRun bool) (syncCollect, error) {
-	gitCollected, err := scan.CollectGit(db, rootPaths(cfg), cfg.Git.AuthorEmails, now, dryRun)
+func collectSync(cfg config.Config, db *store.DB, when syncWhen, dryRun bool) (syncCollect, error) {
+	var gitCollected scan.GitCollect
+	var err error
+	if when.until.IsZero() {
+		gitCollected, err = scan.CollectGit(db, rootPaths(cfg), cfg.Git.AuthorEmails, when.now, dryRun)
+	} else {
+		gitCollected, err = scan.CollectGitUntil(db, rootPaths(cfg), cfg.Git.AuthorEmails, when.now, when.until, dryRun)
+	}
 	if err != nil {
 		return syncCollect{}, err
 	}
-	filesCollected, err := scan.CollectFiles(db, rootPaths(cfg), cfg.ExcludeGlobs, now, dryRun, committedRepos(gitCollected))
+	var filesCollected scan.FileCollect
+	if when.until.IsZero() {
+		filesCollected, err = scan.CollectFiles(db, rootPaths(cfg), cfg.ExcludeGlobs, when.now, dryRun, committedRepos(gitCollected))
+	} else {
+		filesCollected, err = scan.CollectFilesUntil(db, rootPaths(cfg), cfg.ExcludeGlobs, when.now, when.until, dryRun, committedRepos(gitCollected))
+	}
 	if err != nil {
 		return syncCollect{}, err
 	}

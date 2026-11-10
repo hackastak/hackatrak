@@ -35,25 +35,6 @@ func TestRootRegistersPhase0Subcommands(t *testing.T) {
 	}
 }
 
-func TestStubSubcommandsPrintPlaceholder(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	writeValidConfig(t, home)
-
-	for _, name := range []string{"today", "summary", "log"} {
-		t.Run(name, func(t *testing.T) {
-			out, err := execute(t, name)
-			if err != nil {
-				t.Fatalf("execute() error = %v", err)
-			}
-			want := "hackatrak " + name + ": not implemented\n"
-			if out != want {
-				t.Errorf("output = %q, want %q", out, want)
-			}
-		})
-	}
-}
-
 func writeValidConfig(t *testing.T, home string) {
 	t.Helper()
 	body := fmt.Sprintf("vault_path = %q\nrole = \"writer\"\naccount = \"hackastak\"\n\n[[roots]]\npath = %q\nbucket = \"Hackastak\"\n\n[git]\nauthor_emails = [\"me@example.com\"]\n", home, home)

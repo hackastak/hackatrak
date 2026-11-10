@@ -9,7 +9,7 @@ import (
 
 func main() {
 	if err := newRootCmd().Execute(); err != nil {
-		os.Exit(1)
+		os.Exit(exitCode(err))
 	}
 }
 
@@ -21,6 +21,9 @@ func newRootCmd() *cobra.Command {
 		PersistentPreRunE:  prepare,
 		PersistentPostRunE: finish,
 	}
+	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
+		return &usageError{err: err}
+	})
 	cmd.AddCommand(
 		newSyncCmd(),
 		newTodayCmd(),

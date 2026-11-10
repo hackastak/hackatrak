@@ -73,6 +73,19 @@ type TouchedFile struct {
 // a later ! pattern can bring a file back unless a parent directory is
 // itself ignored.
 func FilesSince(roots []string, since time.Time, excludeGlobs ...string) ([]TouchedFile, error) {
+	return filesSince(roots, since, time.Time{}, excludeGlobs...)
+}
+
+// FilesBetween walks roots for regular files with since <= mtime < until.
+// until must be after since. Exclusions match FilesSince.
+func FilesBetween(roots []string, since, until time.Time, excludeGlobs ...string) ([]TouchedFile, error) {
+	if until.IsZero() || !until.After(since) {
+		return nil, fmt.Errorf("files between: until must be after since")
+	}
+	return filesSince(roots, since, until, excludeGlobs...)
+}
+
+func filesSince(roots []string, since, until time.Time, excludeGlobs ...string) ([]TouchedFile, error) {
 	roots, err := collectRoots(roots)
 	if err != nil {
 		return nil, fmt.Errorf("files since: %w", err)
@@ -135,7 +148,7 @@ func FilesSince(roots []string, since time.Time, excludeGlobs ...string) ([]Touc
 			if err != nil {
 				return err
 			}
-			if info.ModTime().Before(since) {
+			if info.ModTime().Before(since) || (!until.IsZero() && !info.ModTime().Before(until)) {
 				return nil
 			}
 			if _, ok := seen[path]; ok {

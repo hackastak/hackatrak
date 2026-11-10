@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -38,6 +39,20 @@ type GitCollect struct {
 // filter fails before any cursor moves. project detection fills the event
 // slug later; this pass stores commits with an empty slug.
 func CollectGit(db *store.DB, roots, authors []string, now time.Time, dryRun bool) (GitCollect, error) {
+	return collectGit(db, roots, authors, now, time.Time{}, dryRun)
+}
+
+// CollectGitUntil is CollectGit limited to commits before until.
+// until is exclusive. A stored cursor is not moved earlier than it already is.
+// until must be after local midnight of now.
+func CollectGitUntil(db *store.DB, roots, authors []string, now, until time.Time, dryRun bool) (GitCollect, error) {
+	if until.IsZero() || !until.After(LocalMidnight(now)) {
+		return GitCollect{}, fmt.Errorf("collect git: until must be after the day's start")
+	}
+	return collectGit(db, roots, authors, now, until, dryRun)
+}
+
+func collectGit(db *store.DB, roots, authors []string, now, until time.Time, dryRun bool) (GitCollect, error) {
 	roots, err := collectRoots(roots)
 	if err != nil {
 		return GitCollect{}, fmt.Errorf("collect git: %w", err)
@@ -62,7 +77,7 @@ func CollectGit(db *store.DB, roots, authors []string, now time.Time, dryRun boo
 			}
 			seen[repo] = struct{}{}
 
-			found, err := collectRepo(db, repo, authors, now, dryRun)
+			found, err := collectRepo(db, repo, authors, now, until, dryRun)
 			if err != nil {
 				return GitCollect{}, err
 			}
@@ -74,12 +89,20 @@ func CollectGit(db *store.DB, roots, authors []string, now time.Time, dryRun boo
 	return result, nil
 }
 
-func collectRepo(db *store.DB, repo string, authors []string, now time.Time, dryRun bool) (GitCollect, error) {
-	since, err := RepoSince(db, repo, now)
+func collectRepo(db *store.DB, repo string, authors []string, now, until time.Time, dryRun bool) (GitCollect, error) {
+	since, bounded, err := repoWindow(db, repo, now, until)
 	if err != nil {
 		return GitCollect{}, fmt.Errorf("collect git: %w", err)
 	}
-	commits, err := CommitsSince(repo, since, authors)
+	if bounded && since == "" {
+		return GitCollect{}, nil
+	}
+	var commits []Commit
+	if until.IsZero() {
+		commits, err = CommitsSince(repo, since, authors)
+	} else {
+		commits, err = commitsSince(repo, since, until.Format(time.RFC3339), authors)
+	}
 	if err != nil {
 		return GitCollect{}, fmt.Errorf("collect git: %w", err)
 	}
@@ -96,12 +119,55 @@ func collectRepo(db *store.DB, repo string, authors []string, now time.Time, dry
 	if err != nil {
 		return GitCollect{}, fmt.Errorf("collect git: %w", err)
 	}
-	if _, err := AdvanceRepoCursor(db, repo, now); err != nil {
+	if until.IsZero() {
+		if _, err := AdvanceRepoCursor(db, repo, now); err != nil {
+			return GitCollect{}, fmt.Errorf("collect git: %w", err)
+		}
+	} else if err := advanceIfForward(db, repo, now); err != nil {
 		return GitCollect{}, fmt.Errorf("collect git: %w", err)
 	}
 	result.Inserted = len(persisted.Inserted)
 	result.Skipped = persisted.Skipped
 	return result, nil
+}
+
+// repoWindow returns the git --since value. A bounded window that the cursor
+// has already passed returns an empty since so the caller skips the repo.
+func repoWindow(db *store.DB, repo string, now, until time.Time) (string, bool, error) {
+	since, err := RepoSince(db, repo, now)
+	if err != nil {
+		return "", false, err
+	}
+	if until.IsZero() {
+		return since, false, nil
+	}
+	start := LocalMidnight(now)
+	sinceTime, err := time.Parse(time.RFC3339, since)
+	if err != nil {
+		return "", false, fmt.Errorf("repo since %s: %w", repo, err)
+	}
+	if !sinceTime.Before(until) {
+		return "", true, nil
+	}
+	if sinceTime.Before(start) {
+		since = start.Format(time.RFC3339)
+	}
+	return since, true, nil
+}
+
+func advanceIfForward(db *store.DB, repo string, now time.Time) error {
+	state, err := db.SyncState(repo)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return err
+	}
+	if err == nil {
+		cursor, parseErr := time.Parse(time.RFC3339, state.Cursor)
+		if parseErr == nil && !now.After(cursor) {
+			return nil
+		}
+	}
+	_, err = AdvanceRepoCursor(db, repo, now)
+	return err
 }
 
 func collectRoots(roots []string) ([]string, error) {

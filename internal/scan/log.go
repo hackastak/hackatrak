@@ -48,6 +48,10 @@ func LocalMidnight(now time.Time) time.Time {
 // are labeled HEAD. A directory that is not itself a repo returns
 // ErrNotRepository, including a subdirectory of a repo.
 func CommitsSince(repo, since string, authors []string) ([]Commit, error) {
+	return commitsSince(repo, since, "", authors)
+}
+
+func commitsSince(repo, since, until string, authors []string) ([]Commit, error) {
 	if strings.TrimSpace(repo) == "" {
 		return nil, fmt.Errorf("commits since: repo path is required")
 	}
@@ -75,7 +79,11 @@ func CommitsSince(repo, since string, authors []string) ([]Commit, error) {
 	if detached {
 		args = append(args, "HEAD")
 	}
-	args = append(args, "--since", since, "--pretty=format:"+commitLogFormat)
+	args = append(args, "--since", since)
+	if strings.TrimSpace(until) != "" {
+		args = append(args, "--until", until)
+	}
+	args = append(args, "--pretty=format:"+commitLogFormat)
 	for _, email := range emails {
 		args = append(args, "--author="+email)
 	}
